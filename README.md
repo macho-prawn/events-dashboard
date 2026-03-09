@@ -81,10 +81,10 @@ flowchart LR
    ```
 5. Check the health endpoint:
    ```bash
-   curl -sS http://127.0.0.1:8081/healthz
+   curl -sS http://127.0.0.1:3000/healthz
    ```
 6. The API will be available at:
-   `http://127.0.0.1:8081`
+   `http://127.0.0.1:3000`
 
 ## Local Development
 Most workflows in this repo assume the Docker Compose stack is running. The commands below cover the common local operator flow.
@@ -175,7 +175,7 @@ curl -sS \
       "amount": 12.5
     }
   }' \
-  http://127.0.0.1:8081/events
+  http://127.0.0.1:3000/events
 ```
 
 Search:
@@ -183,7 +183,7 @@ Search:
 ```bash
 curl -sS \
   -H "Authorization: Bearer $INGESTION_JWT" \
-  "http://127.0.0.1:8081/search?source=Events&company=Acme&q=INV"
+  "http://127.0.0.1:3000/search?source=Events&company=Acme&q=INV"
 ```
 
 **API summary**
@@ -203,7 +203,7 @@ curl -sS \
   - Checks whether the API can reach PostgreSQL
   - Example:
     ```bash
-    curl -sS http://127.0.0.1:8081/healthz
+    curl -sS http://127.0.0.1:3000/healthz
     ```
 - `GET /api-key`
   - Returns a short-lived ingestion/search JWT
@@ -212,7 +212,7 @@ curl -sS \
     ```bash
     curl -sS \
       -H "Authorization: Bearer $ACCESS_JWT" \
-      http://127.0.0.1:8081/api-key
+      http://127.0.0.1:3000/api-key
     ```
 - `POST /source`
   - Creates a source record
@@ -238,7 +238,7 @@ curl -sS \
           {"name":"amount","type":"numeric","required":false}
         ]
       }' \
-      http://127.0.0.1:8081/source
+      http://127.0.0.1:3000/source
     ```
 - `GET /source`
   - Lists source records and their child-table metadata
@@ -246,7 +246,7 @@ curl -sS \
     ```bash
     curl -sS \
       -H "Authorization: Bearer $ACCESS_JWT" \
-      http://127.0.0.1:8081/source
+      http://127.0.0.1:3000/source
     ```
 - `POST /events`
   - Creates an event row in the child table associated with the exact source identity
@@ -276,7 +276,7 @@ curl -sS \
           "amount": 12.5
         }
       }' \
-      http://127.0.0.1:8081/events
+      http://127.0.0.1:3000/events
     ```
 - `GET /search`
   - Searches the child table for the `source + company` owner
@@ -292,17 +292,17 @@ curl -sS \
     ```bash
     curl -sS \
       -H "Authorization: Bearer $INGESTION_JWT" \
-      "http://127.0.0.1:8081/search?source=Events&company=Acme"
+      "http://127.0.0.1:3000/search?source=Events&company=Acme"
     ```
     ```bash
     curl -sS \
       -H "Authorization: Bearer $INGESTION_JWT" \
-      "http://127.0.0.1:8081/search?source=Events&company=Acme&city=Boston&state=Massachusetts&country=United%20States"
+      "http://127.0.0.1:3000/search?source=Events&company=Acme&city=Boston&state=Massachusetts&country=United%20States"
     ```
     ```bash
     curl -sS \
       -H "Authorization: Bearer $INGESTION_JWT" \
-      "http://127.0.0.1:8081/search?source=Events&company=Acme&q=INV&page=2"
+      "http://127.0.0.1:3000/search?source=Events&company=Acme&q=INV&page=2"
     ```
 
 **Testing**
@@ -339,7 +339,7 @@ go test ./...
 ## Environment Variables
 Default values in [.env](.env):
 
-- `APP_PORT=8081`
+- `APP_PORT=3000`
 - `DB_HOST=db`
 - `DB_PORT=5432`
 - `DB_NAME=events`
@@ -347,13 +347,13 @@ Default values in [.env](.env):
 - `DB_PASSWORD=events`
 - `DB_UID=70`
 - `DB_GID=70`
-- `DB_VOLUME=/home/macho_prawn/bootcamp/week2/volumes/database`
+- `DB_VOLUME=<voldir>`
 
 Runtime notes:
 
-- The API listens on `APP_PORT`, default `8081`
+- The API listens on `APP_PORT`, default `3000`
 - The app accepts either `HOST` or `APP_HOST` for the bind address, default `0.0.0.0`
-- The app accepts either `PORT` or `APP_PORT` for the public port, default `8081`
+- The app accepts either `PORT` or `APP_PORT` for the public port, default `3000`
 - `DATABASE_URL` can be provided directly; otherwise it is assembled from the `DB_*` variables
 - `docker-compose.yml` bind-mounts PostgreSQL data from `DB_VOLUME`
 

@@ -23,7 +23,7 @@ Arguments:
 
 Environment:
   ACCESS_JWT    Required. Access JWT used to authenticate POST /source.
-  API_BASE_URL  Optional. Defaults to http://127.0.0.1:${APP_PORT:-8081}
+  API_BASE_URL  Optional. Defaults to http://127.0.0.1:${APP_PORT:-3000}
 
 Example:
   scripts/create-source.sh \
@@ -107,7 +107,7 @@ if [[ -f "${DOCKER_ENV_FILE}" ]]; then
   set +a
 fi
 
-APP_PORT="${APP_PORT:-8081}"
+APP_PORT="${APP_PORT:-3000}"
 API_BASE_URL="${API_BASE_URL:-http://127.0.0.1:${APP_PORT}}"
 
 require_command() {

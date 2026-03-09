@@ -70,7 +70,7 @@ DB_USER="${DB_USER:-events}"
 DB_NAME="${DB_NAME:-events}"
 DB_UID="${DB_UID:-70}"
 DB_GID="${DB_GID:-70}"
-APP_PORT="${APP_PORT:-8081}"
+APP_PORT="${APP_PORT:-3000}"
 API_BASE_URL="${API_BASE_URL:-http://127.0.0.1:${APP_PORT}}"
 
 require_command() {

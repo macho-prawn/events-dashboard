@@ -14,6 +14,6 @@ WORKDIR /app
 
 COPY --from=build /out/events-api /app/events-api
 
-EXPOSE 8081
+EXPOSE 3000
 
 ENTRYPOINT ["/app/events-api"]
