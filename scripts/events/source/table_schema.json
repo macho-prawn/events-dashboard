@@ -1,0 +1,17 @@
+[
+  {"name":"event_id","type":"text","required":true},
+  {"name":"event_name","type":"text","required":true},
+  {"name":"event_category","type":"text","required":true},
+  {"name":"venue_name","type":"text","required":true},
+  {"name":"venue_city","type":"text","required":true},
+  {"name":"venue_country","type":"text","required":true},
+  {"name":"starts_at","type":"timestamptz","required":true},
+  {"name":"ends_at","type":"timestamptz","required":false},
+  {"name":"ticket_currency","type":"text","required":true},
+  {"name":"base_ticket_price","type":"numeric","required":true},
+  {"name":"inventory_count","type":"integer","required":true},
+  {"name":"availability_status","type":"text","required":true},
+  {"name":"is_sold_out","type":"boolean","required":false},
+  {"name":"performers","type":"jsonb","required":false},
+  {"name":"event_metadata","type":"jsonb","required":false}
+]

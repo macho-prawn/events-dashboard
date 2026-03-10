@@ -1,0 +1,87 @@
+[
+  {
+    "name": "article_id",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "headline",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "summary",
+    "type": "text",
+    "required": false
+  },
+  {
+    "name": "article_url",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "canonical_url",
+    "type": "text",
+    "required": false
+  },
+  {
+    "name": "publisher_name",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "publisher_domain",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "section",
+    "type": "text",
+    "required": false
+  },
+  {
+    "name": "author_name",
+    "type": "text",
+    "required": false
+  },
+  {
+    "name": "language",
+    "type": "text",
+    "required": false
+  },
+  {
+    "name": "image_url",
+    "type": "text",
+    "required": false
+  },
+  {
+    "name": "published_at",
+    "type": "timestamptz",
+    "required": true
+  },
+  {
+    "name": "updated_at",
+    "type": "timestamptz",
+    "required": false
+  },
+  {
+    "name": "is_breaking",
+    "type": "boolean",
+    "required": false
+  },
+  {
+    "name": "tags",
+    "type": "jsonb",
+    "required": false
+  },
+  {
+    "name": "entities",
+    "type": "jsonb",
+    "required": false
+  },
+  {
+    "name": "raw_metadata",
+    "type": "jsonb",
+    "required": false
+  }
+]

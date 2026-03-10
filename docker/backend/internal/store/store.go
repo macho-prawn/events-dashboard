@@ -24,6 +24,7 @@ import (
 
 var (
 	ErrDuplicateSource      = errors.New("duplicate source")
+	ErrDuplicateEvent       = errors.New("duplicate event")
 	ErrSourceNotFound       = errors.New("source not found")
 	ErrSourceOwnerNotFound  = errors.New("source owner not found")
 	ErrSourceSchemaMismatch = errors.New("source schema mismatch")
@@ -110,7 +111,11 @@ func (s *PostgresStore) AutoMigrate() error {
 		return err
 	}
 
-	return s.migrateLegacySourceTables(context.Background())
+	if err := s.migrateLegacySourceTables(context.Background()); err != nil {
+		return err
+	}
+
+	return s.enforceReplayProtection(context.Background())
 }
 
 func (s *PostgresStore) EnsureAPIKeyAccess(ctx context.Context, seed models.APIKeyAccess) (*models.APIKeyAccess, error) {
@@ -216,8 +221,14 @@ func (s *PostgresStore) CreateSource(ctx context.Context, source string, company
 			if err := createChildTable(tx, childTableName, normalizedSchema); err != nil {
 				return err
 			}
+			if err := ensureSourceReplayProtection(tx, record.Source, childTableName, normalizedSchema); err != nil {
+				return err
+			}
 		} else if errors.Is(err, gorm.ErrRecordNotFound) {
 			if err := createChildTable(tx, childTableName, normalizedSchema); err != nil {
+				return err
+			}
+			if err := ensureSourceReplayProtection(tx, record.Source, childTableName, normalizedSchema); err != nil {
 				return err
 			}
 		} else {
@@ -288,6 +299,9 @@ func (s *PostgresStore) CreateEvent(ctx context.Context, source string, company 
 		Payload:        values,
 	}
 	if err := row.Scan(&result.ID, &result.CreatedAt); err != nil {
+		if isUniqueViolation(err) {
+			return nil, ErrDuplicateEvent
+		}
 		return nil, err
 	}
 
@@ -591,8 +605,34 @@ func (s *PostgresStore) migrateLegacySourceTables(ctx context.Context) error {
 	})
 }
 
+func (s *PostgresStore) enforceReplayProtection(ctx context.Context) error {
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var sources []models.Source
+		if err := tx.Order("id ASC").Find(&sources).Error; err != nil {
+			return err
+		}
+
+		for _, source := range sources {
+			schema, err := normalizeSchema(source.TableSchema)
+			if err != nil {
+				return err
+			}
+
+			if err := ensureSourceReplayProtection(tx, source.Source, source.ChildTableName, schema); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
 func normalizeLegacySource(source models.Source) (models.Source, error) {
-	source.Source = properCase(source.Source)
+	normalizedSource, err := validateSource(source.Source)
+	if err != nil {
+		return models.Source{}, err
+	}
+	source.Source = normalizedSource
 	source.Company = properCase(source.Company)
 
 	location, err := normalizeLegacyLocation(source)
@@ -605,6 +645,104 @@ func normalizeLegacySource(source models.Source) (models.Source, error) {
 	source.Country = location.CountryName
 
 	return source, nil
+}
+
+func replayProtectionColumnForSource(source string, schema models.TableSchema) string {
+	normalizedSource, err := validateSource(source)
+	if err != nil {
+		return ""
+	}
+
+	switch normalizedSource {
+	case "News":
+		return firstSchemaColumnMatch(schema, "article_id")
+	case "Flights":
+		return firstSchemaColumnMatch(schema, "flight_id")
+	case "Events":
+		return firstSchemaColumnMatch(schema, "invoice_number", "event_id")
+	case "ECommerce":
+		return firstSchemaColumnMatch(schema, "order_id", "invoice_number", "transaction_id")
+	}
+
+	return ""
+}
+
+func firstSchemaColumnMatch(schema models.TableSchema, candidates ...string) string {
+	for _, candidate := range candidates {
+		if schemaHasColumn(schema, candidate) {
+			return candidate
+		}
+	}
+
+	return ""
+}
+
+func ensureSourceReplayProtection(tx *gorm.DB, source string, tableName string, schema models.TableSchema) error {
+	replayKey := replayProtectionColumnForSource(source, schema)
+	if replayKey == "" {
+		return nil
+	}
+	if err := dedupeChildTableByReplayKey(tx, tableName, replayKey); err != nil {
+		return err
+	}
+
+	return ensureReplayProtectionIndex(tx, tableName, replayKey)
+}
+
+func schemaHasColumn(schema models.TableSchema, name string) bool {
+	for _, column := range schema {
+		if column.Name == name {
+			return true
+		}
+	}
+
+	return false
+}
+
+func dedupeChildTableByReplayKey(tx *gorm.DB, tableName string, replayKey string) error {
+	query := fmt.Sprintf(
+		`DELETE FROM %s
+		WHERE id IN (
+			SELECT id FROM (
+				SELECT id, ROW_NUMBER() OVER (
+					PARTITION BY source_parent_id, %s
+					ORDER BY id ASC
+				) AS row_num
+				FROM %s
+				WHERE %s IS NOT NULL
+			) duplicates
+			WHERE row_num > 1
+		)`,
+		pq.QuoteIdentifier(tableName),
+		pq.QuoteIdentifier(replayKey),
+		pq.QuoteIdentifier(tableName),
+		pq.QuoteIdentifier(replayKey),
+	)
+
+	return tx.Exec(query).Error
+}
+
+func ensureReplayProtectionIndex(tx *gorm.DB, tableName string, replayKey string) error {
+	indexName := replayProtectionIndexName(tableName, replayKey)
+	query := fmt.Sprintf(
+		"CREATE UNIQUE INDEX IF NOT EXISTS %s ON %s (source_parent_id, %s)",
+		pq.QuoteIdentifier(indexName),
+		pq.QuoteIdentifier(tableName),
+		pq.QuoteIdentifier(replayKey),
+	)
+
+	return tx.Exec(query).Error
+}
+
+func replayProtectionIndexName(tableName string, replayKey string) string {
+	indexName := "uniq_" + tableName + "_" + replayKey
+	if len(indexName) <= 63 {
+		return indexName
+	}
+
+	hash := fmt.Sprintf("%x", md5Bytes(indexName))[:8]
+	maxPrefix := 63 - len(hash) - 1
+	return indexName[:maxPrefix] + "_" + hash
 }
 
 func preparePayload(schema models.TableSchema, payload map[string]any) (map[string]any, error) {
@@ -867,6 +1005,11 @@ func properCase(value string) string {
 
 func validateSource(source string) (string, error) {
 	source = strings.TrimSpace(source)
+	for candidate := range allowedSources {
+		if strings.EqualFold(candidate, source) {
+			return candidate, nil
+		}
+	}
 	if _, ok := allowedSources[source]; !ok {
 		return "", fmt.Errorf("%w: source must be one of Events, News, ECommerce, Flights", ErrInvalidSource)
 	}
@@ -905,6 +1048,20 @@ func normalizeLegacyLocation(source models.Source) (reference.Airport, error) {
 
 func equalFoldTrim(left string, right string) bool {
 	return strings.EqualFold(strings.TrimSpace(left), strings.TrimSpace(right))
+}
+
+func isUniqueViolation(err error) bool {
+	var pqErr *pq.Error
+	if errors.As(err, &pqErr) {
+		return pqErr.Code == "23505"
+	}
+
+	var sqlStateErr interface{ SQLState() string }
+	if errors.As(err, &sqlStateErr) {
+		return sqlStateErr.SQLState() == "23505"
+	}
+
+	return false
 }
 
 func numericValue(value any) (float64, bool) {

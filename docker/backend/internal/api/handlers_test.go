@@ -273,6 +273,25 @@ func TestCreateEventUnknownSource(t *testing.T) {
 	}
 }
 
+func TestCreateEventDuplicate(t *testing.T) {
+	server := newTestServer(t, &stubStore{
+		createEventFn: func(context.Context, string, string, string, string, string, map[string]any) (*store.ChildEventRow, error) {
+			return nil, store.ErrDuplicateEvent
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/events", bytes.NewReader([]byte(`{"source":"Flights","company":"delta air lines","city":"Atlanta","state":"Georgia","country":"United States","payload":{"flight_id":"delta-air-lines-000001"}}`)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+newIngestionToken(t))
+
+	recorder := httptest.NewRecorder()
+	server.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusConflict {
+		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+}
+
 func TestSearchEventsSuccess(t *testing.T) {
 	server := newTestServer(t, &stubStore{
 		searchEventsFn: func(_ context.Context, source string, company string, city string, state string, country string, query string, page int, pageSize int) ([]store.ChildEventRow, int64, error) {

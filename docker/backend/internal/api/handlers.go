@@ -238,6 +238,8 @@ func (h *Handler) CreateEvent(ctx context.Context, input *CreateEventInput) (*Cr
 		switch {
 		case errors.Is(err, store.ErrSourceNotFound):
 			return nil, huma.Error404NotFound(err.Error())
+		case errors.Is(err, store.ErrDuplicateEvent):
+			return nil, huma.Error409Conflict(err.Error())
 		case errors.Is(err, store.ErrInvalidSource), errors.Is(err, store.ErrInvalidPayload), errors.Is(err, store.ErrInvalidLocation):
 			return nil, huma.Error400BadRequest(err.Error())
 		default:
