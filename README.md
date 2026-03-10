@@ -95,9 +95,9 @@ flowchart LR
 2. Make sure `curl`, `jq`, and `openssl` are available on the host.
 3. Create the PostgreSQL bind-mount directory from [.env](.env):
    ```bash
-   mkdir -p /home/macho_prawn/bootcamp/week2/volumes/database
-   chown -R 70:70 /home/macho_prawn/bootcamp/week2/volumes/database
-   chmod -R 700 /home/macho_prawn/bootcamp/week2/volumes/database
+   mkdir -p <voldir>
+   chown -R 70:70 <voldir>
+   chmod -R 700 <voldir>
    ```
 4. Start the stack from the repository root:
    ```bash
@@ -398,7 +398,7 @@ Default values in [.env](.env):
 - `DB_PASSWORD=events`
 - `DB_UID=70`
 - `DB_GID=70`
-- `DB_VOLUME=/home/macho_prawn/bootcamp/week2/volumes/database`
+- `DB_VOLUME=<voldir>`
 
 Runtime notes:
 
