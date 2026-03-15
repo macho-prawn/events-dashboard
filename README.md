@@ -16,7 +16,10 @@
 
 A source-driven ingestion API and dashboard for `Events`, `News`, `ECommerce`, and `Flights`, backed by PostgreSQL with JWT-based access control, dynamic child tables, per-owner replay protection, and a frontend workspace for project linking and analytics.
 
+### Projects View
 ![Projects-View](images/events-dashboard-projects-view.png)
+
+### Analytics View
 ![Analytics-View](images/events-dashboard-analytics-view.png)
 
 [Back to top](#top)
