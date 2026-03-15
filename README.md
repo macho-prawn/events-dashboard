@@ -175,10 +175,9 @@ go test ./...
 2. Architecture needs to be redesigned:
    - Add a messaging layer.
    - Move towards a user-based AuthN/AuthZ.
-   - Add per-user time-bound access JWT in the UI.
-   - Add per-user time-bound ingestion JWT in the UI.
-   - Add source creation in the UI.
-   - Allow company-based analytics creation in the UI.
+   - Add per-user time-bound access/ingestion JWT/ via the UI.
+   - Add source (admin)/company (user) CRUD via the UI.
+   - Add source/company-based analytics CRUD via the UI.
 
 [Back to top](#top)
 
