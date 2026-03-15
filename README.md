@@ -173,9 +173,12 @@ go test ./...
 ## TODO
 1. Integrate TLS/SSL.
 2. Architecture needs to be redesigned:
-   - Incorporate a messaging layer.
+   - Add a messaging layer.
    - Move towards a user-based AuthN/AuthZ.
-   - Incorporate source creation in the UI.
+   - Add per-user time-bound access JWT in the UI.
+   - Add per-user time-bound ingestion JWT in the UI.
+   - Add source creation in the UI.
+   - Allow company-based analytics creation in the UI.
 
 [Back to top](#top)
 
