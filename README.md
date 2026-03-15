@@ -208,10 +208,10 @@ X refinement.
 [Back to top](#top)
 
 ## Special Notes
-- The API listens on `APP_PORT`, default `3000`
+- The API listens on `BACKEND_PORT`, default `3000`
 - The frontend is published on `FRONTEND_PORT`, default `8081`
 - The app accepts either `HOST` or `APP_HOST` for the bind address, default `0.0.0.0`
-- The app accepts either `PORT` or `APP_PORT` for the public port, default `3000`
+- The app accepts either `PORT` or `BACKEND_PORT` for the public port, default `3000`
 - `DATABASE_URL` can be provided directly; otherwise it is assembled from the `DB_*` variables plus `DB_SSLMODE` defaulting to `disable`
 - `docker-compose.yml` bind-mounts PostgreSQL data from `DB_VOLUME`
 - Docker Compose service/container names use the `events-dashboard-*` prefix
