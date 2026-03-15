@@ -3,4 +3,4 @@
 .gocache/
 coverage.out
 dist/
-node-modules/
+node_modules/
