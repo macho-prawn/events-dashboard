@@ -30,14 +30,14 @@ services:
         condition: service_healthy
     environment:
       HOST: 0.0.0.0
-      PORT: ${APP_PORT}
+      PORT: ${BACKEND_PORT}
       DB_HOST: ${DB_HOST:-events-dashboard-db}
       DB_PORT: ${DB_PORT:-5432}
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "${APP_PORT}:${APP_PORT}"
+      - "${BACKEND_PORT}:${BACKEND_PORT}"
 
   events-dashboard-frontend:
     image: frontend:latest

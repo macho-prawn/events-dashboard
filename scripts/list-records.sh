@@ -26,7 +26,7 @@ Arguments:
 
 Environment:
   INGESTION_JWT  Required for both record search mode and source-only company probes.
-  API_BASE_URL   Optional. Defaults to http://127.0.0.1:${APP_PORT:-3000}
+  API_BASE_URL   Optional. Defaults to http://127.0.0.1:${BACKEND_PORT:-3000}
 
 Example:
   INGESTION_JWT="$(scripts/generate-jwt.sh -t ingestion)" \
@@ -133,8 +133,8 @@ if [[ -f "${DOCKER_ENV_FILE}" ]]; then
   set +a
 fi
 
-APP_PORT="${APP_PORT:-3000}"
-API_BASE_URL="${API_BASE_URL:-http://127.0.0.1:${APP_PORT}}"
+BACKEND_PORT="${BACKEND_PORT:-3000}"
+API_BASE_URL="${API_BASE_URL:-http://127.0.0.1:${BACKEND_PORT}}"
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then

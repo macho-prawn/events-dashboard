@@ -209,8 +209,8 @@ if [[ -f "${{DOCKER_ENV_FILE}}" ]]; then
   set +a
 fi
 
-APP_PORT="${{APP_PORT:-3000}}"
-API_BASE_URL="${{API_BASE_URL:-http://127.0.0.1:${{APP_PORT}}}}"
+BACKEND_PORT="${{BACKEND_PORT:-3000}}"
+API_BASE_URL="${{API_BASE_URL:-http://127.0.0.1:${{BACKEND_PORT}}}}"
 INGESTION_JWT="${{INGESTION_JWT:?INGESTION_JWT is required}}"
 
 require_command() {{

@@ -15,7 +15,7 @@ type Config struct {
 
 func Load() (Config, error) {
 	cfg := Config{
-		PublicServerAddr:       buildAddr(getFirstEnv("HOST", "APP_HOST", "0.0.0.0"), getFirstEnv("PORT", "APP_PORT", "3000")),
+		PublicServerAddr:       buildAddr(getFirstEnv("HOST", "APP_HOST", "0.0.0.0"), getFirstEnv("PORT", "BACKEND_PORT", "3000")),
 		DatabaseURL:            buildDatabaseURL(),
 	}
 
