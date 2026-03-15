@@ -19,7 +19,7 @@ services:
       retries: 10
 
   events-dashboard-backend:
-    image: backend:latest
+    image: events-dashboard-backend:latest
     container_name: events-dashboard-backend
     build:
       context: ./docker/backend
@@ -40,7 +40,7 @@ services:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
 
   events-dashboard-frontend:
-    image: frontend:latest
+    image: events-dashboard-frontend:latest
     container_name: events-dashboard-frontend
     build:
       context: ./docker/frontend
