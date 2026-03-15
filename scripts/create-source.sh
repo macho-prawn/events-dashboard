@@ -5,7 +5,7 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/create-source.sh -s <source> -c <company> -i <city> -t <state> -n <country> -j <tableSchema-json-or-file>
+  scripts/create-source.sh -s <source> -c <company> -i <city> -t <state> -n <country> -w <website-domain> -j <tableSchema-json-or-file>
 
 Description:
   Creates a source record by calling POST /source with an access JWT.
@@ -19,6 +19,7 @@ Arguments:
   -i city         City name, for example "Boston"
   -t state        State or region name, for example "Massachusetts"
   -n country      Country name, for example "United States"
+  -w websiteDomain  Required website domain, for example "example.com"
   -j tableSchema  Inline JSON array or a file path to JSON
 
 Environment:
@@ -32,6 +33,7 @@ Example:
     -i "Boston" \
     -t "Massachusetts" \
     -n "United States" \
+    -w "acme.com" \
     -j '[{"name":"invoice_number","type":"text","required":true},{"name":"amount","type":"numeric","required":false}]'
 
 Example using a file:
@@ -41,6 +43,7 @@ Example using a file:
     -i "Boston" \
     -t "Massachusetts" \
     -n "United States" \
+    -w "acme.com" \
     -j /path/to/table-schema.json
 EOF
 }
@@ -51,8 +54,9 @@ CITY_NAME=""
 STATE_NAME=""
 COUNTRY_NAME=""
 TABLE_SCHEMA_INPUT=""
+WEBSITE_DOMAIN=""
 
-while getopts ":s:c:i:t:n:j:h" opt; do
+while getopts ":s:c:i:t:n:w:j:h" opt; do
   case "${opt}" in
     s)
       SOURCE_NAME="${OPTARG}"
@@ -68,6 +72,9 @@ while getopts ":s:c:i:t:n:j:h" opt; do
       ;;
     n)
       COUNTRY_NAME="${OPTARG}"
+      ;;
+    w)
+      WEBSITE_DOMAIN="${OPTARG}"
       ;;
     j)
       TABLE_SCHEMA_INPUT="${OPTARG}"
@@ -150,6 +157,11 @@ if [[ -z "$(printf '%s' "${COUNTRY_NAME}" | tr -d '[:space:]')" ]]; then
   exit 1
 fi
 
+if [[ -z "$(printf '%s' "${WEBSITE_DOMAIN}" | tr -d '[:space:]')" ]]; then
+  echo "websiteDomain is required" >&2
+  exit 1
+fi
+
 if [[ -z "$(printf '%s' "${TABLE_SCHEMA_INPUT}" | tr -d '[:space:]')" ]]; then
   echo "tableSchema is required" >&2
   exit 1
@@ -173,6 +185,7 @@ REQUEST_BODY="$(
     --arg city "${CITY_NAME}" \
     --arg state "${STATE_NAME}" \
     --arg country "${COUNTRY_NAME}" \
+    --arg websiteDomain "${WEBSITE_DOMAIN}" \
     --argjson tableSchema "${TABLE_SCHEMA_JSON}" \
     '{
       source: $source,
@@ -180,6 +193,7 @@ REQUEST_BODY="$(
       city: $city,
       state: $state,
       country: $country,
+      websiteDomain: $websiteDomain,
       tableSchema: $tableSchema
     }'
 )"

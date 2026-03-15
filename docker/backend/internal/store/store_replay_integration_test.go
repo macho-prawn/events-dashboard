@@ -236,14 +236,14 @@ func TestCreateEventRejectsDuplicateReplayKeyPerSourceParent(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	first, err := store.CreateSource(ctx, "Flights", "Delta Air Lines", "Atlanta", "Georgia", "United States", models.TableSchema{
+	first, err := store.CreateSource(ctx, "Flights", "Delta Air Lines", "Atlanta", "Georgia", "United States", "", models.TableSchema{
 		{Name: "flight_id", Type: "text", Required: true},
 	})
 	if err != nil {
 		t.Fatalf("CreateSource(first) error = %v", err)
 	}
 
-	second, err := store.CreateSource(ctx, "Flights", "Delta Air Lines", "Boston", "Massachusetts", "United States", models.TableSchema{
+	second, err := store.CreateSource(ctx, "Flights", "Delta Air Lines", "Boston", "Massachusetts", "United States", "", models.TableSchema{
 		{Name: "flight_id", Type: "text", Required: true},
 	})
 	if err != nil {
@@ -285,13 +285,13 @@ func TestCreateEventRejectsDuplicateReplayKeyForEventsAndECommerce(t *testing.T)
 
 	ctx := context.Background()
 
-	eventSource, err := store.CreateSource(ctx, "Events", "Acme", "Boston", "Massachusetts", "United States", models.TableSchema{
+	eventSource, err := store.CreateSource(ctx, "Events", "Acme", "Boston", "Massachusetts", "United States", "", models.TableSchema{
 		{Name: "invoice_number", Type: "text", Required: true},
 	})
 	if err != nil {
 		t.Fatalf("CreateSource(Events) error = %v", err)
 	}
-	ecommerceSource, err := store.CreateSource(ctx, "ECommerce", "Shopify", "Ottawa", "Ontario", "Canada", models.TableSchema{
+	ecommerceSource, err := store.CreateSource(ctx, "ECommerce", "Shopify", "Ottawa", "Ontario", "Canada", "", models.TableSchema{
 		{Name: "order_id", Type: "text", Required: true},
 	})
 	if err != nil {

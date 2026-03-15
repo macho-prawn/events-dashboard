@@ -5,12 +5,16 @@ import (
 	_ "embed"
 	"encoding/csv"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 )
 
 //go:embed airport_locations.csv
 var airportLocationsData []byte
+
+//go:embed airports.dat
+var airportsData []byte
 
 type Airport struct {
 	Code        string
@@ -19,6 +23,8 @@ type Airport struct {
 	CountryName string
 	ISOCountry  string
 	ISORegion   string
+	Lat         float64
+	Lng         float64
 }
 
 var (
@@ -94,6 +100,46 @@ func loadAirports() {
 		if _, exists := locations[key]; !exists {
 			locations[key] = airport
 		}
+	}
+
+	dataReader := csv.NewReader(bytes.NewReader(airportsData))
+	dataReader.FieldsPerRecord = -1
+	dataRecords, err := dataReader.ReadAll()
+	if err != nil {
+		airportIndexErr = err
+		return
+	}
+
+	for _, record := range dataRecords {
+		if len(record) < 8 {
+			continue
+		}
+
+		code := strings.ToUpper(strings.TrimSpace(record[4]))
+		if len(code) != 3 || code == `\N` {
+			continue
+		}
+
+		lat, err := strconv.ParseFloat(strings.TrimSpace(record[6]), 64)
+		if err != nil {
+			continue
+		}
+		lng, err := strconv.ParseFloat(strings.TrimSpace(record[7]), 64)
+		if err != nil {
+			continue
+		}
+
+		airport := index[code]
+		airport.Code = code
+		if airport.City == "" {
+			airport.City = strings.TrimSpace(record[2])
+		}
+		if airport.CountryName == "" {
+			airport.CountryName = strings.TrimSpace(record[3])
+		}
+		airport.Lat = lat
+		airport.Lng = lng
+		index[code] = airport
 	}
 
 	airportIndex = index

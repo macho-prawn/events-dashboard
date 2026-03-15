@@ -12,4 +12,5 @@ ACCESS_JWT="${ACCESS_JWT:?ACCESS_JWT is required}" \
   -i "Boston" \
   -t "Massachusetts" \
   -n "United States" \
+  -w "wayfair.com" \
   -j "${SCRIPT_DIR}/table_schema.json"

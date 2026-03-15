@@ -12,4 +12,5 @@ ACCESS_JWT="${ACCESS_JWT:?ACCESS_JWT is required}" \
   -i "Gautam Buddha Nagar" \
   -t "Uttar Pradesh" \
   -n "India" \
+  -w "indianexpress.com" \
   -j "${SCRIPT_DIR}/table_schema.json"

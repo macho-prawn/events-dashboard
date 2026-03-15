@@ -45,6 +45,94 @@ func NewPublicServer(deps Dependencies) (http.Handler, error) {
 	}, handler.CreateSource)
 
 	huma.Register(api, huma.Operation{
+		OperationID: "create-project",
+		Method:      http.MethodPost,
+		Path:        "/projects",
+		Summary:     "Create a project tied to an ingestion JWT",
+		Tags:        []string{"projects"},
+	}, handler.CreateProject)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "list-projects",
+		Method:      http.MethodGet,
+		Path:        "/projects",
+		Summary:     "List stored projects",
+		Tags:        []string{"projects"},
+	}, handler.ListProjects)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "delete-project",
+		Method:      http.MethodDelete,
+		Path:        "/projects/{projectName}",
+		Summary:     "Delete a stored project",
+		Tags:        []string{"projects"},
+	}, handler.DeleteProject)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "bootstrap-project",
+		Method:      http.MethodGet,
+		Path:        "/projects/bootstrap",
+		Summary:     "Load the bootstrapped workspace for the frontend",
+		Tags:        []string{"projects"},
+	}, handler.BootstrapProject)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "update-project-ingestion-jwt",
+		Method:      http.MethodPut,
+		Path:        "/projects/{projectName}/ingestion-jwt",
+		Summary:     "Update a project's stored ingestion JWT",
+		Tags:        []string{"projects"},
+	}, handler.UpdateProjectIngestionJWT)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "update-all-project-ingestion-jwts",
+		Method:      http.MethodPut,
+		Path:        "/projects/ingestion-jwt",
+		Summary:     "Update all stored projects to a single ingestion JWT",
+		Tags:        []string{"projects"},
+	}, handler.UpdateAllProjectsIngestionJWT)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "attach-project-owner",
+		Method:      http.MethodPost,
+		Path:        "/projects/{projectName}/owners",
+		Summary:     "Attach a source/company owner to a project",
+		Tags:        []string{"projects"},
+	}, handler.AttachProjectOwner)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "delete-project-owner",
+		Method:      http.MethodDelete,
+		Path:        "/projects/{projectName}/owners",
+		Summary:     "Detach a source/company owner from a project",
+		Tags:        []string{"projects"},
+	}, handler.DeleteProjectOwner)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "list-project-owners",
+		Method:      http.MethodGet,
+		Path:        "/projects/{projectName}/owners",
+		Summary:     "List source/company owners attached to a project",
+		Tags:        []string{"projects"},
+	}, handler.ListProjectOwners)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "get-project-dashboard",
+		Method:      http.MethodGet,
+		Path:        "/projects/{projectName}/dashboard",
+		Summary:     "Load aggregated dashboard analytics for a linked source/company owner",
+		Tags:        []string{"projects"},
+	}, handler.GetProjectDashboard)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "get-source-company-analytics",
+		Method:      http.MethodGet,
+		Path:        "/analytics/{source}/{companyName}",
+		Summary:     "Load aggregated source/company analytics for a single company child table",
+		Tags:        []string{"analytics"},
+	}, handler.GetSourceCompanyAnalytics)
+
+	huma.Register(api, huma.Operation{
 		OperationID: "list-sources",
 		Method:      http.MethodGet,
 		Path:        "/source",

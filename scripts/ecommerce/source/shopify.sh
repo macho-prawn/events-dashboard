@@ -12,4 +12,5 @@ ACCESS_JWT="${ACCESS_JWT:?ACCESS_JWT is required}" \
   -i "Ottawa" \
   -t "Ontario" \
   -n "Canada" \
+  -w "shopify.com" \
   -j "${SCRIPT_DIR}/table_schema.json"

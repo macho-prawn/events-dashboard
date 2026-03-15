@@ -4,8 +4,10 @@ import "time"
 
 type Source struct {
 	ID             uint        `gorm:"primaryKey"`
+	SourceOwnerID  uint        `gorm:"column:source_owner_id;index"`
 	Source         string      `gorm:"not null;index:idx_source_identity,unique;index:idx_source_owner"`
 	Company        string      `gorm:"not null;index:idx_source_identity,unique;index:idx_source_owner"`
+	WebsiteDomain  string      `gorm:"-"`
 	City           string      `gorm:"not null;index:idx_source_identity,unique"`
 	State          string      `gorm:"not null;index:idx_source_identity,unique"`
 	Country        string      `gorm:"not null;index:idx_source_identity,unique"`

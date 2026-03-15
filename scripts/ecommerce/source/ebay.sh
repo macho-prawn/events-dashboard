@@ -12,4 +12,5 @@ ACCESS_JWT="${ACCESS_JWT:?ACCESS_JWT is required}" \
   -i "San Jose" \
   -t "California" \
   -n "United States" \
+  -w "ebay.com" \
   -j "${SCRIPT_DIR}/table_schema.json"

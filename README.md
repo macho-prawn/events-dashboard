@@ -1,10 +1,7 @@
 <a id="top"></a>
 
-# events-dashboard
-
-A source-driven ingestion API for `Events`, `News`, `ECommerce`, and `Flights`, backed by PostgreSQL with JWT-based access control, dynamic child tables, and per-owner replay protection.
-
-## Table of Contents
+# Table of Contents
+- [Description](#description)
 - [Main Features](#main-features)
 - [Tech Stack](#tech-stack)
 - [Data Model (Current)](#data-model-current)
@@ -13,58 +10,53 @@ A source-driven ingestion API for `Events`, `News`, `ECommerce`, and `Flights`, 
 - [Local Development](#local-development)
 - [TODO](#todo)
 - [Development Attribution](#development-attribution)
-- [Environment Variables](#environment-variables)
+- [Special Notes](#special-notes)
+
+## Description
+
+A source-driven ingestion API and dashboard for `Events`, `News`, `ECommerce`, and `Flights`, backed by PostgreSQL with JWT-based access control, dynamic child tables, per-owner replay protection, and a frontend workspace for project linking and analytics.
+
+![Projects-View](images/events-dashboard-projects-view.png)
+![Analytics-View](images/events-dashboard-analytics-view.png)
+
+[Back to top](#top)
 
 ## Main Features
-- Source-managed ingestion model:
-  - A source record is uniquely identified by `source + company + city + state + country`
-  - Event rows are stored in a child table shared by the owning `source + company`
-- Dynamic schema support:
-  - Each owner defines its payload schema through `tableSchema`
-  - Supported column types are `text`, `integer`, `bigint`, `boolean`, `numeric`, `timestamptz`, and `jsonb`
-- JWT-based access model:
-  - Access JWT for `GET /api-key`, `POST /source`, and `GET /source`
-  - Ingestion/search JWT for `POST /events` and `GET /search`
-- Validation and normalization:
-  - Allowed source names are `Events`, `News`, `ECommerce`, and `Flights`
-  - Source matching is case-insensitive and stored in canonical form
-  - `company`, `city`, and `state` are normalized to title case
-  - `country` is trimmed and validated against embedded airport reference data
-  - `city + state + country` must match the embedded airport location reference
-  - Required payload fields cannot be missing or `null`
-  - Unknown payload fields are rejected
-- Replay protection:
-  - New child tables get a unique replay index when the schema contains the domain replay key
-  - Duplicate inserts return `409 Conflict`
-  - Existing rows are deduplicated during migration by keeping the earliest row per `source_parent_id + replay_key`
-  - Replay keys currently used are `article_id` for `News`, `flight_id` for `Flights`, `invoice_number` or `event_id` for `Events`, and `order_id`, `invoice_number`, or `transaction_id` for `ECommerce`
-- Automated startup behavior:
-  - Runs database migrations
-  - Removes the legacy shared `events` table
-  - Migrates legacy source rows to the canonical source/location model
-  - Seeds the singleton `api_key_access` row if needed
-- Helper scripts:
-  - `scripts/generate-jwt.sh` for access and ingestion token generation
-  - `scripts/create-source.sh` for source creation
-  - `scripts/{events,news,ecommerce,flights}/generate_assets.py` for sample source/event fixtures and shell helpers
+- Backend:
+  - Stores sources, source owners, projects, and dynamic event tables in PostgreSQL
+  - Validates source locations, schemas, and event payloads before writes
+  - Issues JWTs for access and ingestion flows
+  - Enforces replay protection and serves analytics data
+- Frontend:
+  - Provides a projects workspace to link sources and companies
+  - Loads analytics views for each linked company
+  - Renders company favicons from `websiteDomain` when available
+  - Proxies `/api/*` requests to the backend
+- Scripts:
+  - Generate JWTs, create sources, list records, and seed sample source/event data
 
 [Back to top](#top)
 
 ## Tech Stack
-- API: Go, Huma, GORM
+- Frontend: React, Vite, Nginx
+- Backend: Go, Huma, GORM
 - Database: PostgreSQL 17
 - Runtime: Docker, Docker Compose
-- Tooling: Bash, `curl`, `jq`, `openssl`, Python 3
-- Reference data: embedded airport location CSV
+- HostOS / Virtualization: Windows 11 / Hyper-V
+- Linux Emulation: WSL Ubuntu
+- `bash` clis: `curl`, `jq`, `openssl`
+- Script Integration:  Python 3
 
 [Back to top](#top)
 
 ## Data Model (Current)
 - `sources`: source metadata plus the JSON schema used by the owner
+- `source_owners`: shared owner metadata for `source + company`, including `website_domain`
 - `api_key_access`: signing secrets, issuers, subjects, and ingestion TTL settings
 - `events_<normalized-source>_<normalized-company>`: dynamic child tables for each `source + company` owner
 - Source ownership rules:
   - `source + company` determines the shared child table
+  - `source + company` determines the shared `source_owners` row
   - `source + company + city + state + country` determines the specific source record
 - Replay-protection rules:
   - Replay protection is enforced per `source_parent_id`, not globally across an owner table
@@ -79,334 +71,145 @@ A source-driven ingestion API for `Events`, `News`, `ECommerce`, and `Flights`, 
 ## Architecture Diagram
 ```mermaid
 flowchart LR
-  C[Client / curl / scripts] --> API[Go API]
-  API --> DB[(PostgreSQL)]
-  API --> REF[Airport reference data]
+  U[User / Browser] --> FE[Frontend<br/>Nginx + React]
+  O[Operator / Scripts / curl] --> BE
+  FE -->|/api/*| BE[Backend API<br/>Go + Huma + GORM]
 
-  DB --- S[(sources)]
-  DB --- K[(api_key_access)]
-  DB --- E[(dynamic event tables)]
+  BE -->|health, source, events, search,<br/>projects, analytics, bootstrap| DB[(PostgreSQL)]
+  BE -->|location validation<br/>airport lookup| REF[Embedded Reference Data<br/>airport locations + airports.dat]
+
+  DB --- AK[(api_key_access)]
+  DB --- SO[(source_owners)]
+  DB --- SR[(sources)]
+  DB --- PJ[(projects)]
+  DB --- PE[(project_entities / links)]
+  DB --- EV[(events_<source>_<company><br/>dynamic child tables)]
+
+  O -->|generate access JWT| AK
+  O -->|create source| BE
+  O -->|post events| BE
+  O -->|search/list records| BE
+
+  BE -->|mint ingestion/search JWT| O
+  BE -->|bootstrap + analytics JSON| FE
+  SO -->|website_domain| FE
+  SR -->|source metadata + schema| FE
+  EV -->|aggregations + route map data| BE
 ```
 
 [Back to top](#top)
 
 ## Run with Docker
-1. Make sure Docker with Compose support is installed.
-2. Make sure `curl`, `jq`, and `openssl` are available on the host.
-3. Create the PostgreSQL bind-mount directory from [.env](.env):
+1. Copy env file:
+   ```bash
+   cp .env.example .env
+   ```
+2. Create the volume directory and update your `.env` file accordingy:
    ```bash
    mkdir -p <voldir>
    chown -R 70:70 <voldir>
    chmod -R 700 <voldir>
+   cat >> .env << EOF
+   DB_VOLUME=${pwd}/<db-vol-dir>
+   EOF
    ```
-4. Start the stack from the repository root:
+3. Start the stack from the repo root:
    ```bash
    docker compose -f docker-compose.yml --env-file .env up --build
    ```
-5. Check the health endpoint:
+4. Check the health endpoint:
    ```bash
-   curl -sS http://127.0.0.1:3000/healthz
+   curl -sS http://localhost:3000/healthz
    ```
-6. The API will be available at `http://127.0.0.1:3000`.
+5. The API will be available at `http://localhost:3000`.
+6. The dashboard frontend will be available at `http://localhost:8081`.
 
 [Back to top](#top)
 
 ## Local Development
-Most workflows in this repo assume the Docker Compose stack is running.
+Local development is centered on the Docker Compose stack.
 
-**Relevant paths**
+**Services**
 
-- [README.md](README.md)
-- [docker-compose.yml](docker-compose.yml)
-- [.env](.env)
-- [docker/backend/](docker/backend)
-- [docker/backend/cmd/api/main.go](docker/backend/cmd/api/main.go)
-- [docker/backend/internal/api/](docker/backend/internal/api)
-- [docker/backend/internal/store/store.go](docker/backend/internal/store/store.go)
-- [docker/backend/internal/testutil/postgres.go](docker/backend/internal/testutil/postgres.go)
-- [docker/backend/internal/reference/airport_locations.csv](docker/backend/internal/reference/airport_locations.csv)
-- [scripts/generate-jwt.sh](scripts/generate-jwt.sh)
-- [scripts/create-source.sh](scripts/create-source.sh)
-- [scripts/events/](scripts/events)
-- [scripts/news/](scripts/news)
-- [scripts/ecommerce/](scripts/ecommerce)
-- [scripts/flights/](scripts/flights)
+- Frontend: `http://localhost:8081`
+- Backend: `http://localhost:3000`
+- Database container: `events-dashboard-db`
 
-**Authentication model**
+**Workflow**
 
-- Access JWT:
-  - Signed with the access secret stored in `api_key_access`
-  - Used for source management and minting ingestion/search JWTs
-  - Non-expiring in the current implementation
-- Ingestion/search JWT:
-  - Signed with the ingestion secret stored in `api_key_access`
-  - Used for `POST /events` and `GET /search`
-  - Default TTL is `3600` seconds
+1. Start the stack with Docker Compose.
+2. Generate an access JWT with `scripts/generate-jwt.sh -t access`.
+3. Create a source with `scripts/create-source.sh`.
+4. Generate an ingestion JWT with `scripts/generate-jwt.sh -t ingestion`.
+5. Insert, search, or list records with the API and helper scripts.
 
-Generate tokens with:
+**Key scripts**
 
-```bash
-scripts/generate-jwt.sh -t access
-scripts/generate-jwt.sh -t ingestion
-```
+- `scripts/generate-jwt.sh`: creates access and ingestion tokens
+- `scripts/create-source.sh`: creates a source and child events table; `-w <website-domain>` is required
+- `scripts/list-records.sh`: lists records for a source owner
+- `scripts/<domain>/source/*.sh`: creates seeded sources
+- `scripts/<domain>/events/*.sh`: posts seeded events
 
-Notes:
+**Main endpoints**
 
-- `scripts/generate-jwt.sh -t access` reads JWT config from the `db` container and signs the token locally
-- `scripts/generate-jwt.sh -t ingestion` first builds the access token, then calls `GET /api-key` and extracts `.apiKey`
-
-**Common workflow**
-
-1. Start the stack.
-2. Generate an access token.
-3. Create a source record and its child table.
-4. Generate an ingestion token.
-5. Insert events.
-6. Search events.
-
-Quick example:
-
-```bash
-ACCESS_JWT="$(scripts/generate-jwt.sh -t access)"
-```
-
-Create a source:
-
-```bash
-ACCESS_JWT="$ACCESS_JWT" scripts/create-source.sh \
-  -s "Events" \
-  -c "Acme" \
-  -i "Boston" \
-  -t "Massachusetts" \
-  -n "United States" \
-  -j '[{"name":"invoice_number","type":"text","required":true},{"name":"amount","type":"numeric","required":false}]'
-```
-
-Fetch an ingestion token:
-
-```bash
-INGESTION_JWT="$(scripts/generate-jwt.sh -t ingestion)"
-```
-
-Insert an event:
-
-```bash
-curl -sS \
-  -X POST \
-  -H "Authorization: Bearer $INGESTION_JWT" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source": "Events",
-    "company": "Acme",
-    "city": "Boston",
-    "state": "Massachusetts",
-    "country": "United States",
-    "payload": {
-      "invoice_number": "INV-100",
-      "amount": 12.5
-    }
-  }' \
-  http://127.0.0.1:3000/events
-```
-
-Search:
-
-```bash
-curl -sS \
-  -H "Authorization: Bearer $INGESTION_JWT" \
-  "http://127.0.0.1:3000/search?source=Events&company=Acme&q=INV"
-```
-
-**Generated fixture assets**
-
-- Each domain folder contains a `generate_assets.py` script that writes:
-  - `source/*.sh` helpers for creating canonical sources
-  - `events/*.sh` helpers for bulk posting fixture events
-  - `events/*_events.json` fixture datasets
-- The generated event scripts treat `409` responses as duplicate detections and fail at the end if duplicates were seen.
-
-**API summary**
-
-| Method | Path | Auth | Purpose |
-| --- | --- | --- | --- |
-| `GET` | `/healthz` | none | Health check |
-| `GET` | `/api-key` | access JWT | Issue ingestion/search JWT |
-| `POST` | `/source` | access JWT | Create a source row and child table |
-| `GET` | `/source` | access JWT | List source rows |
-| `POST` | `/events` | ingestion/search JWT | Insert an event into the matching child table |
-| `GET` | `/search` | ingestion/search JWT | Search events inside the child table for a `source + company` owner |
-
-**Endpoint details**
-
-- `GET /healthz`
-  - Checks whether the API can reach PostgreSQL
-  - Example:
-    ```bash
-    curl -sS http://127.0.0.1:3000/healthz
-    ```
-- `GET /api-key`
-  - Returns a short-lived ingestion/search JWT
-  - Response fields: `apiKey`, `expiresAt`
-  - Example:
-    ```bash
-    curl -sS \
-      -H "Authorization: Bearer $ACCESS_JWT" \
-      http://127.0.0.1:3000/api-key
-    ```
-- `POST /source`
-  - Creates a source record
-  - If this is the first record for a given `source + company`, the API creates a child table named from that owner pair
-  - If the owner already exists, the incoming schema must match the existing schema exactly
-  - Required body fields: `source`, `company`, `city`, `state`, `country`, `tableSchema`
-  - `tableSchema` must be a non-empty JSON array of column definitions with `name`, `type`, and `required`
-  - Allowed column types: `text`, `integer`, `bigint`, `boolean`, `numeric`, `timestamptz`, `jsonb`
-  - Example:
-    ```bash
-    curl -sS \
-      -X POST \
-      -H "Authorization: Bearer $ACCESS_JWT" \
-      -H "Content-Type: application/json" \
-      -d '{
-        "source": "Events",
-        "company": "Acme",
-        "city": "Boston",
-        "state": "Massachusetts",
-        "country": "United States",
-        "tableSchema": [
-          {"name":"invoice_number","type":"text","required":true},
-          {"name":"amount","type":"numeric","required":false}
-        ]
-      }' \
-      http://127.0.0.1:3000/source
-    ```
-- `GET /source`
-  - Lists source records and their child-table metadata
-  - Example:
-    ```bash
-    curl -sS \
-      -H "Authorization: Bearer $ACCESS_JWT" \
-      http://127.0.0.1:3000/source
-    ```
-- `POST /events`
-  - Creates an event row in the child table associated with the exact source identity
-  - Required body fields: `source`, `company`, `city`, `state`, `country`, `payload`
-  - `payload` must include every required schema field, omit unsupported fields, and use values compatible with the declared column types
-  - Duplicate replay-key inserts for the same `source_parent_id` return `409 Conflict`
-  - Type expectations:
-    - `text` -> JSON string
-    - `integer` and `bigint` -> integer value
-    - `numeric` -> numeric value
-    - `boolean` -> boolean value
-    - `timestamptz` -> RFC3339 string
-    - `jsonb` -> valid JSON value
-  - Example:
-    ```bash
-    curl -sS \
-      -X POST \
-      -H "Authorization: Bearer $INGESTION_JWT" \
-      -H "Content-Type: application/json" \
-      -d '{
-        "source": "Events",
-        "company": "Acme",
-        "city": "Boston",
-        "state": "Massachusetts",
-        "country": "United States",
-        "payload": {
-          "invoice_number": "INV-100",
-          "amount": 12.5
-        }
-      }' \
-      http://127.0.0.1:3000/events
-    ```
-- `GET /search`
-  - Searches the child table for the `source + company` owner
-  - Required query params: `source`, `company`
-  - Optional query params: `city`, `state`, `country`, `q`, `page`
-  - Search behavior:
-    - `source` and `company` select the owner table
-    - `city`, `state`, and `country` further filter results inside that table
-    - `q` performs `ILIKE` search only across dynamic `text` payload columns
-    - `page` defaults to `1`
-    - Page size is fixed at `50`
-  - Examples:
-    ```bash
-    curl -sS \
-      -H "Authorization: Bearer $INGESTION_JWT" \
-      "http://127.0.0.1:3000/search?source=Events&company=Acme"
-    ```
-    ```bash
-    curl -sS \
-      -H "Authorization: Bearer $INGESTION_JWT" \
-      "http://127.0.0.1:3000/search?source=Events&company=Acme&city=Boston&state=Massachusetts&country=United%20States"
-    ```
-    ```bash
-    curl -sS \
-      -H "Authorization: Bearer $INGESTION_JWT" \
-      "http://127.0.0.1:3000/search?source=Events&company=Acme&q=INV&page=2"
-    ```
+- `GET /healthz`: health check
+- `GET /api-key`: returns an ingestion/search JWT from an access JWT
+- `POST /source`: creates a source row and child table
+- `GET /source`: lists source rows
+- `POST /events`: inserts an event
+- `GET /search`: searches records for a `source + company`
 
 **Testing**
 
-Run the Go test suite from [docker/backend/](docker/backend):
+Run backend tests from [docker/backend/](docker/backend):
 
 ```bash
 go test ./...
 ```
 
-Integration tests that create isolated PostgreSQL databases require `EVENTS_TEST_DATABASE_URL` to be set.
-
 [Back to top](#top)
 
 ## TODO
-- No explicit project TODO list is currently maintained in this README.
-- Current operational constraints and notes:
-  - CORS headers are stripped from responses
-  - `OPTIONS` requests return `405 Method Not Allowed`
-  - An existing `source + company` owner cannot be reused with a different schema
-  - Replay protection only applies when a source schema includes one of the recognized replay-key columns
+1. Integrate TLS/SSL.
+2. Architecture needs to be redesigned:
+   - Incorporate a messaging layer.
+   - Move towards a user-based AuthN/AuthZ.
+   - Incorporate source creation in the UI.
 
 [Back to top](#top)
 
 ## Development Attribution
-- Current repository scope:
-  - Go API service in [docker/backend/](docker/backend)
-  - Docker Compose runtime in [docker-compose.yml](docker-compose.yml)
-  - Core operator scripts in [scripts/generate-jwt.sh](scripts/generate-jwt.sh) and [scripts/create-source.sh](scripts/create-source.sh)
-  - Domain fixture generators and helper scripts in [scripts/events/](scripts/events), [scripts/news/](scripts/news), [scripts/ecommerce/](scripts/ecommerce), and [scripts/flights/](scripts/flights)
-  - Embedded location reference data in [docker/backend/internal/reference/airport_locations.csv](docker/backend/internal/reference/airport_locations.csv)
+- Principal developer: Codex (GPT-5 coding agent). _// old N00b � assisted a bit_
+- Collaboration model: iterative prompt-driven development in the local repo with incremental implementation, debugging, and U
+X refinement.
 
 ### Prompt Summary (Consolidated)
-- Start the Docker Compose stack with the configured PostgreSQL bind mount
-- Generate an access JWT from `api_key_access`
-- Create a source using `source`, `company`, location fields, and `tableSchema`
-- Generate an ingestion/search JWT through `GET /api-key`
-- Insert events whose payload matches the declared schema
-- Search records inside the owner table with optional location filters and text search
-- Reject duplicate event replays for recognized replay-key columns
-- Validate all locations against the embedded airport reference data
+
+- Run the application locally with Docker Compose using the renamed `events-dashboard-db`, `events-dashboard-backend`, and `events-dashboard-frontend` services.
+- Expose the backend API on `localhost:3000` and the frontend on `localhost:8081`, with the frontend reverse-proxying API traffic to the backend service.
+- Use the backend to manage source owners, source records, projects, linked companies, analytics payloads, and dynamic per-owner event tables in PostgreSQL.
+- Require `websiteDomain` when creating new sources so company favicon rendering comes from explicit source metadata rather than depending on legacy backend fallbacks.
+- Preserve stored `website_domain` values across backend restarts so migrations and owner backfills do not wipe manually set or newly created company domains.
+- Use helper scripts to generate access JWTs, mint ingestion/search JWTs, create sources, list records, and seed sample data for `Events`, `News`, `ECommerce`, and `Flights`.
+- Create seeded source scripts under `scripts/<domain>/source/` and seeded event scripts plus JSON fixtures under `scripts/<domain>/events/` so new demo companies can be added consistently.
+- Validate source locations, schema definitions, and event payloads in the backend before writes, including required fields, normalized column names, reserved-name checks, and owner-schema consistency.
+- Store shared company metadata in `source_owners`, including `website_domain`, and expose that domain through source and bootstrap API responses so the frontend can render company favicons in project selection views.
+- Render frontend company visuals in two layers: generic source thumbnails derived from source type, and company favicons derived from `websiteDomain` when present.
+- Support analytics views in the frontend for linked companies, including dashboards, charts, and flight route maps driven by backend analytics endpoints.
+- Build flight route maps from embedded airport reference data instead of a small hardcoded airport map so routes for newly added companies and broader airport coverage continue to resolve correctly.
+- Use embedded airport/location datasets in the backend for both source location validation and flight coordinate lookup, keeping route analytics and source creation aligned with the same reference data.
 
 [Back to top](#top)
 
-## Environment Variables
-Default values in [.env](.env):
-
-- `APP_PORT=3000`
-- `DB_HOST=db`
-- `DB_PORT=5432`
-- `DB_NAME=events`
-- `DB_USER=events`
-- `DB_PASSWORD=events`
-- `DB_UID=70`
-- `DB_GID=70`
-- `DB_VOLUME=<voldir>`
-
-Runtime notes:
-
+## Special Notes
 - The API listens on `APP_PORT`, default `3000`
+- The frontend is published on `FRONTEND_PORT`, default `8081`
 - The app accepts either `HOST` or `APP_HOST` for the bind address, default `0.0.0.0`
 - The app accepts either `PORT` or `APP_PORT` for the public port, default `3000`
 - `DATABASE_URL` can be provided directly; otherwise it is assembled from the `DB_*` variables plus `DB_SSLMODE` defaulting to `disable`
 - `docker-compose.yml` bind-mounts PostgreSQL data from `DB_VOLUME`
+- Docker Compose service/container names use the `events-dashboard-*` prefix
 
 Schema and event validation rules:
 

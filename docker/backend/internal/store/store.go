@@ -23,16 +23,22 @@ import (
 )
 
 var (
-	ErrDuplicateSource      = errors.New("duplicate source")
-	ErrDuplicateEvent       = errors.New("duplicate event")
-	ErrSourceNotFound       = errors.New("source not found")
-	ErrSourceOwnerNotFound  = errors.New("source owner not found")
-	ErrSourceSchemaMismatch = errors.New("source schema mismatch")
-	ErrInvalidTableSchema   = errors.New("invalid table schema")
-	ErrInvalidSource        = errors.New("invalid source")
-	ErrInvalidSourceOwner   = errors.New("invalid source/company")
-	ErrInvalidPayload       = errors.New("invalid payload")
-	ErrInvalidLocation      = errors.New("invalid city/state/country")
+	ErrDuplicateSource          = errors.New("duplicate source")
+	ErrDuplicateEvent           = errors.New("duplicate event")
+	ErrDuplicateProject         = errors.New("duplicate project")
+	ErrDuplicateProjectLink     = errors.New("duplicate project source owner link")
+	ErrProjectOwnerLinkNotFound = errors.New("project source owner link not found")
+	ErrProjectNotFound          = errors.New("project not found")
+	ErrSourceNotFound           = errors.New("source not found")
+	ErrSourceOwnerNotFound      = errors.New("source owner not found")
+	ErrSourceSchemaMismatch     = errors.New("source schema mismatch")
+	ErrInvalidTableSchema       = errors.New("invalid table schema")
+	ErrInvalidSource            = errors.New("invalid source")
+	ErrInvalidSourceOwner       = errors.New("invalid source/company")
+	ErrInvalidWebsiteDomain     = errors.New("invalid website domain")
+	ErrInvalidPayload           = errors.New("invalid payload")
+	ErrInvalidLocation          = errors.New("invalid city/state/country")
+	ErrInvalidProject           = errors.New("invalid project")
 )
 
 var (
@@ -62,11 +68,49 @@ var (
 		"ECommerce": {},
 		"Flights":   {},
 	}
+	projectNamePattern = regexp.MustCompile(`^[A-Za-z0-9]+$`)
+	// Legacy-only defaults for backfill and compatibility with older source records.
+	defaultWebsiteDomains = map[string]string{
+		"ecommerce::amazon":           "amazon.com",
+		"ecommerce::carousell":        "carousell.com",
+		"ecommerce::ebay":             "ebay.com",
+		"ecommerce::shopify":          "shopify.com",
+		"ecommerce::target":           "target.com",
+		"ecommerce::wayfair":          "wayfair.com",
+		"events::bookmyshow":          "bookmyshow.com",
+		"events::dice":                "dice.fm",
+		"events::eventbrite":          "eventbrite.com",
+		"events::eventim":             "eventim.de",
+		"events::moshtix":             "moshtix.com.au",
+		"events::sistic":              "sistic.com.sg",
+		"flights::delta air lines":    "delta.com",
+		"flights::emirates":           "emirates.com",
+		"flights::qantas":             "qantas.com",
+		"flights::singapore airlines": "singaporeair.com",
+		"flights::southwest airlines": "southwest.com",
+		"flights::united airlines":    "united.com",
+		"news::africanews":            "africanews.com",
+		"news::bbc":                   "bbc.com",
+		"news::cna":                   "channelnewsasia.com",
+		"news::gestion":               "gestion.pe",
+		"news::sbs news":              "sbs.com.au",
+		"news::the indian express":    "indianexpress.com",
+	}
 )
 
 type EventStore interface {
-	CreateSource(ctx context.Context, source string, company string, city string, state string, country string, schema models.TableSchema) (*models.Source, error)
+	CreateSource(ctx context.Context, source string, company string, city string, state string, country string, websiteDomain string, schema models.TableSchema) (*models.Source, error)
 	ListSources(ctx context.Context) ([]models.Source, error)
+	CreateProject(ctx context.Context, projectName string, ingestionJWT string, ingestionJWTExpiresAt *time.Time) (*models.Project, error)
+	ListProjects(ctx context.Context) ([]models.Project, error)
+	GetLatestProject(ctx context.Context) (*models.Project, error)
+	DeleteProject(ctx context.Context, projectName string) error
+	UpdateProjectIngestionJWT(ctx context.Context, projectName string, ingestionJWT string, ingestionJWTExpiresAt *time.Time) (*models.Project, error)
+	AttachProjectSourceOwner(ctx context.Context, projectName string, source string, company string) (*models.SourceOwner, error)
+	DetachProjectSourceOwner(ctx context.Context, projectName string, source string, company string) error
+	ListProjectSourceOwners(ctx context.Context, projectName string) ([]models.SourceOwner, error)
+	GetSourceOwnerEvents(ctx context.Context, source string, company string) (*models.SourceOwner, []ChildEventRow, error)
+	GetProjectOwnerEvents(ctx context.Context, projectName string, source string, company string) (*models.SourceOwner, []ChildEventRow, error)
 	CreateEvent(ctx context.Context, source string, company string, city string, state string, country string, payload map[string]any) (*ChildEventRow, error)
 	SearchEvents(ctx context.Context, source string, company string, city string, state string, country string, query string, page int, pageSize int) ([]ChildEventRow, int64, error)
 	Ping(ctx context.Context) error
@@ -98,7 +142,13 @@ func NewPostgresStore(databaseURL string) (*PostgresStore, error) {
 }
 
 func (s *PostgresStore) AutoMigrate() error {
-	if err := s.db.AutoMigrate(&models.APIKeyAccess{}, &models.Source{}); err != nil {
+	if err := s.db.AutoMigrate(
+		&models.APIKeyAccess{},
+		&models.SourceOwner{},
+		&models.Source{},
+		&models.Project{},
+		&models.ProjectSourceOwner{},
+	); err != nil {
 		return err
 	}
 
@@ -110,8 +160,20 @@ func (s *PostgresStore) AutoMigrate() error {
 	if err := s.db.Exec("ALTER TABLE sources ADD COLUMN IF NOT EXISTS state TEXT").Error; err != nil {
 		return err
 	}
+	if err := s.db.Exec("ALTER TABLE sources ADD COLUMN IF NOT EXISTS source_owner_id BIGINT").Error; err != nil {
+		return err
+	}
+	if err := s.db.Exec("ALTER TABLE projects ADD COLUMN IF NOT EXISTS ingestion_jwt_expires_at TIMESTAMPTZ").Error; err != nil {
+		return err
+	}
 
 	if err := s.migrateLegacySourceTables(context.Background()); err != nil {
+		return err
+	}
+	if err := s.backfillSourceOwners(context.Background()); err != nil {
+		return err
+	}
+	if err := s.backfillSourceOwnerWebsiteDomains(context.Background()); err != nil {
 		return err
 	}
 
@@ -172,8 +234,12 @@ func (s *PostgresStore) EnsureAPIKeyAccess(ctx context.Context, seed models.APIK
 	return &access, nil
 }
 
-func (s *PostgresStore) CreateSource(ctx context.Context, source string, company string, city string, state string, country string, schema models.TableSchema) (*models.Source, error) {
+func (s *PostgresStore) CreateSource(ctx context.Context, source string, company string, city string, state string, country string, websiteDomain string, schema models.TableSchema) (*models.Source, error) {
 	normalizedSchema, err := normalizeSchema(schema)
+	if err != nil {
+		return nil, err
+	}
+	normalizedWebsiteDomain, err := normalizeRequiredWebsiteDomain(websiteDomain)
 	if err != nil {
 		return nil, err
 	}
@@ -193,6 +259,7 @@ func (s *PostgresStore) CreateSource(ctx context.Context, source string, company
 	}
 
 	record := &models.Source{
+		SourceOwnerID:  0,
 		Source:         source,
 		Company:        company,
 		City:           location.City,
@@ -212,28 +279,12 @@ func (s *PostgresStore) CreateSource(ctx context.Context, source string, company
 			return err
 		}
 
-		var owner models.Source
-		err = tx.Where("source = ? AND company = ?", record.Source, record.Company).Order("id ASC").First(&owner).Error
-		if err == nil {
-			if owner.ChildTableName != childTableName || !schemaEqual(owner.TableSchema, normalizedSchema) {
-				return ErrSourceSchemaMismatch
-			}
-			if err := createChildTable(tx, childTableName, normalizedSchema); err != nil {
-				return err
-			}
-			if err := ensureSourceReplayProtection(tx, record.Source, childTableName, normalizedSchema); err != nil {
-				return err
-			}
-		} else if errors.Is(err, gorm.ErrRecordNotFound) {
-			if err := createChildTable(tx, childTableName, normalizedSchema); err != nil {
-				return err
-			}
-			if err := ensureSourceReplayProtection(tx, record.Source, childTableName, normalizedSchema); err != nil {
-				return err
-			}
-		} else {
+		owner, err := ensureSourceOwnerTx(tx, record.Source, record.Company, normalizedWebsiteDomain, childTableName, normalizedSchema)
+		if err != nil {
 			return err
 		}
+		record.SourceOwnerID = owner.ID
+		record.WebsiteDomain = owner.WebsiteDomain
 
 		return tx.Create(record).Error
 	})
@@ -250,7 +301,251 @@ func (s *PostgresStore) ListSources(ctx context.Context) ([]models.Source, error
 		return nil, err
 	}
 
+	if err := s.attachWebsiteDomains(ctx, sources); err != nil {
+		return nil, err
+	}
+
 	return sources, nil
+}
+
+func (s *PostgresStore) CreateProject(ctx context.Context, projectName string, ingestionJWT string, ingestionJWTExpiresAt *time.Time) (*models.Project, error) {
+	normalizedName, err := normalizeProjectName(projectName)
+	if err != nil {
+		return nil, err
+	}
+
+	trimmedJWT := strings.TrimSpace(ingestionJWT)
+	if trimmedJWT == "" {
+		return nil, fmt.Errorf("%w: ingestion JWT is required", ErrInvalidProject)
+	}
+
+	project := &models.Project{
+		ProjectName:           normalizedName,
+		IngestionJWT:          trimmedJWT,
+		IngestionJWTExpiresAt: ingestionJWTExpiresAt,
+	}
+
+	if err := s.db.WithContext(ctx).Create(project).Error; err != nil {
+		if isUniqueViolation(err) {
+			return nil, ErrDuplicateProject
+		}
+		return nil, err
+	}
+
+	return project, nil
+}
+
+func (s *PostgresStore) ListProjects(ctx context.Context) ([]models.Project, error) {
+	var projects []models.Project
+	if err := s.db.WithContext(ctx).Order("project_name ASC").Find(&projects).Error; err != nil {
+		return nil, err
+	}
+
+	return projects, nil
+}
+
+func (s *PostgresStore) GetLatestProject(ctx context.Context) (*models.Project, error) {
+	var project models.Project
+	err := s.db.WithContext(ctx).Order("updated_at DESC, id DESC").First(&project).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &project, nil
+}
+
+func (s *PostgresStore) DeleteProject(ctx context.Context, projectName string) error {
+	normalizedName, err := normalizeProjectName(projectName)
+	if err != nil {
+		return err
+	}
+
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var project models.Project
+		if err := tx.Where("project_name = ?", normalizedName).First(&project).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrProjectNotFound
+			}
+			return err
+		}
+
+		if err := tx.Where("project_id = ?", project.ID).Delete(&models.ProjectSourceOwner{}).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Delete(&models.Project{}, project.ID).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
+func (s *PostgresStore) UpdateProjectIngestionJWT(ctx context.Context, projectName string, ingestionJWT string, ingestionJWTExpiresAt *time.Time) (*models.Project, error) {
+	normalizedName, err := normalizeProjectName(projectName)
+	if err != nil {
+		return nil, err
+	}
+
+	trimmedJWT := strings.TrimSpace(ingestionJWT)
+	if trimmedJWT == "" {
+		return nil, fmt.Errorf("%w: ingestion JWT is required", ErrInvalidProject)
+	}
+
+	project, err := s.findProjectByName(ctx, normalizedName)
+	if err != nil {
+		return nil, err
+	}
+
+	project.IngestionJWT = trimmedJWT
+	project.IngestionJWTExpiresAt = ingestionJWTExpiresAt
+	if err := s.db.WithContext(ctx).Save(project).Error; err != nil {
+		return nil, err
+	}
+
+	return project, nil
+}
+
+func (s *PostgresStore) AttachProjectSourceOwner(ctx context.Context, projectName string, source string, company string) (*models.SourceOwner, error) {
+	project, err := s.findProjectByName(ctx, projectName)
+	if err != nil {
+		return nil, err
+	}
+	owner, err := s.findSourceOwner(ctx, source, company)
+	if err != nil {
+		return nil, err
+	}
+
+	link := &models.ProjectSourceOwner{
+		ProjectID:     project.ID,
+		SourceOwnerID: owner.ID,
+	}
+	if err := s.db.WithContext(ctx).Create(link).Error; err != nil {
+		if isUniqueViolation(err) {
+			return nil, ErrDuplicateProjectLink
+		}
+		return nil, err
+	}
+
+	return owner, nil
+}
+
+func (s *PostgresStore) ListProjectSourceOwners(ctx context.Context, projectName string) ([]models.SourceOwner, error) {
+	project, err := s.findProjectByName(ctx, projectName)
+	if err != nil {
+		return nil, err
+	}
+
+	var owners []models.SourceOwner
+	err = s.db.WithContext(ctx).
+		Table("source_owners").
+		Select("source_owners.*").
+		Joins("JOIN project_source_owners ON project_source_owners.source_owner_id = source_owners.id").
+		Where("project_source_owners.project_id = ?", project.ID).
+		Order("source_owners.source ASC, source_owners.company ASC").
+		Find(&owners).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return owners, nil
+}
+
+func (s *PostgresStore) DetachProjectSourceOwner(ctx context.Context, projectName string, source string, company string) error {
+	project, err := s.findProjectByName(ctx, projectName)
+	if err != nil {
+		return err
+	}
+	owner, err := s.findSourceOwner(ctx, source, company)
+	if err != nil {
+		return err
+	}
+
+	result := s.db.WithContext(ctx).
+		Where("project_id = ? AND source_owner_id = ?", project.ID, owner.ID).
+		Delete(&models.ProjectSourceOwner{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrProjectOwnerLinkNotFound
+	}
+
+	return nil
+}
+
+func (s *PostgresStore) GetProjectOwnerEvents(ctx context.Context, projectName string, source string, company string) (*models.SourceOwner, []ChildEventRow, error) {
+	project, err := s.findProjectByName(ctx, projectName)
+	if err != nil {
+		return nil, nil, err
+	}
+	owner, err := s.findSourceOwner(ctx, source, company)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var link models.ProjectSourceOwner
+	if err := s.db.WithContext(ctx).
+		Where("project_id = ? AND source_owner_id = ?", project.ID, owner.ID).
+		First(&link).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, ErrProjectOwnerLinkNotFound
+		}
+		return nil, nil, err
+	}
+
+	events, err := s.readSourceOwnerEvents(ctx, owner)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return owner, events, nil
+}
+
+func (s *PostgresStore) GetSourceOwnerEvents(ctx context.Context, source string, company string) (*models.SourceOwner, []ChildEventRow, error) {
+	owner, err := s.findSourceOwner(ctx, source, company)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	events, err := s.readSourceOwnerEvents(ctx, owner)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return owner, events, nil
+}
+
+func (s *PostgresStore) readSourceOwnerEvents(ctx context.Context, owner *models.SourceOwner) ([]ChildEventRow, error) {
+	schema, err := normalizeSchema(owner.TableSchema)
+	if err != nil {
+		return nil, err
+	}
+
+	sqlDB, err := s.db.DB()
+	if err != nil {
+		return nil, err
+	}
+
+	rowsQuery := fmt.Sprintf(
+		"SELECT * FROM %s ORDER BY created_at DESC",
+		pq.QuoteIdentifier(owner.ChildTableName),
+	)
+	rows, err := sqlDB.QueryContext(ctx, rowsQuery)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	events, err := scanChildRows(rows, schemaByName(schema))
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
 }
 
 func (s *PostgresStore) CreateEvent(ctx context.Context, source string, company string, city string, state string, country string, payload map[string]any) (*ChildEventRow, error) {
@@ -259,7 +554,12 @@ func (s *PostgresStore) CreateEvent(ctx context.Context, source string, company 
 		return nil, err
 	}
 
-	schema, err := normalizeSchema(parent.TableSchema)
+	owner, err := s.sourceOwnerForSource(ctx, parent)
+	if err != nil {
+		return nil, err
+	}
+
+	schema, err := normalizeSchema(owner.TableSchema)
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +578,7 @@ func (s *PostgresStore) CreateEvent(ctx context.Context, source string, company 
 
 	insert := fmt.Sprintf(
 		"INSERT INTO %s (%s) VALUES (%s) RETURNING id, created_at",
-		pq.QuoteIdentifier(parent.ChildTableName),
+		pq.QuoteIdentifier(owner.ChildTableName),
 		joinIdentifiers(columns),
 		buildPlaceholders(len(columns)),
 	)
@@ -431,8 +731,8 @@ func (s *PostgresStore) findSourceByIdentity(ctx context.Context, source string,
 	return &record, nil
 }
 
-func (s *PostgresStore) findSourceOwner(ctx context.Context, source string, company string) (*models.Source, error) {
-	var record models.Source
+func (s *PostgresStore) findSourceOwner(ctx context.Context, source string, company string) (*models.SourceOwner, error) {
+	var record models.SourceOwner
 	var err error
 	source, err = validateSource(source)
 	if err != nil {
@@ -441,7 +741,6 @@ func (s *PostgresStore) findSourceOwner(ctx context.Context, source string, comp
 	company = properCase(company)
 	err = s.db.WithContext(ctx).
 		Where("source = ? AND company = ?", source, company).
-		Order("id ASC").
 		First(&record).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -451,6 +750,88 @@ func (s *PostgresStore) findSourceOwner(ctx context.Context, source string, comp
 	}
 
 	return &record, nil
+}
+
+func (s *PostgresStore) findProjectByName(ctx context.Context, projectName string) (*models.Project, error) {
+	normalizedName, err := normalizeProjectName(projectName)
+	if err != nil {
+		return nil, err
+	}
+
+	var project models.Project
+	err = s.db.WithContext(ctx).Where("project_name = ?", normalizedName).First(&project).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrProjectNotFound
+		}
+		return nil, err
+	}
+
+	return &project, nil
+}
+
+func (s *PostgresStore) sourceOwnerForSource(ctx context.Context, source *models.Source) (*models.SourceOwner, error) {
+	if source.SourceOwnerID != 0 {
+		var owner models.SourceOwner
+		err := s.db.WithContext(ctx).Where("id = ?", source.SourceOwnerID).First(&owner).Error
+		if err == nil {
+			return &owner, nil
+		}
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+	}
+
+	return s.findSourceOwner(ctx, source.Source, source.Company)
+}
+
+func (s *PostgresStore) attachWebsiteDomains(ctx context.Context, sources []models.Source) error {
+	if len(sources) == 0 {
+		return nil
+	}
+
+	ownerIDs := make([]uint, 0, len(sources))
+	seenOwnerIDs := make(map[uint]struct{}, len(sources))
+	for _, source := range sources {
+		if source.SourceOwnerID == 0 {
+			continue
+		}
+		if _, seen := seenOwnerIDs[source.SourceOwnerID]; seen {
+			continue
+		}
+		seenOwnerIDs[source.SourceOwnerID] = struct{}{}
+		ownerIDs = append(ownerIDs, source.SourceOwnerID)
+	}
+
+	ownerDomains := make(map[uint]string, len(ownerIDs))
+	if len(ownerIDs) > 0 {
+		var owners []models.SourceOwner
+		if err := s.db.WithContext(ctx).Where("id IN ?", ownerIDs).Find(&owners).Error; err != nil {
+			return err
+		}
+		for _, owner := range owners {
+			ownerDomains[owner.ID] = owner.WebsiteDomain
+		}
+	}
+
+	for index := range sources {
+		if domain := ownerDomains[sources[index].SourceOwnerID]; domain != "" {
+			sources[index].WebsiteDomain = domain
+			continue
+		}
+
+		owner, err := s.findSourceOwner(ctx, sources[index].Source, sources[index].Company)
+		if err == nil {
+			sources[index].WebsiteDomain = owner.WebsiteDomain
+			continue
+		}
+		if errors.Is(err, ErrSourceOwnerNotFound) {
+			continue
+		}
+		return err
+	}
+
+	return nil
 }
 
 func normalizeSchema(schema models.TableSchema) (models.TableSchema, error) {
@@ -486,6 +867,21 @@ func normalizeSchema(schema models.TableSchema) (models.TableSchema, error) {
 	}
 
 	return normalized, nil
+}
+
+func normalizeProjectName(projectName string) (string, error) {
+	trimmed := strings.TrimSpace(projectName)
+	if trimmed == "" {
+		return "", fmt.Errorf("%w: project name is required", ErrInvalidProject)
+	}
+	if len(trimmed) > 10 {
+		return "", fmt.Errorf("%w: project name must be 10 characters or fewer", ErrInvalidProject)
+	}
+	if !projectNamePattern.MatchString(trimmed) {
+		return "", fmt.Errorf("%w: project name must be alphanumeric only", ErrInvalidProject)
+	}
+
+	return trimmed, nil
 }
 
 func buildChildTableName(source string, company string) (string, error) {
@@ -539,6 +935,63 @@ func createChildTable(tx *gorm.DB, tableName string, schema models.TableSchema) 
 	}
 
 	return nil
+}
+
+func ensureSourceOwnerTx(tx *gorm.DB, source string, company string, websiteDomain string, childTableName string, schema models.TableSchema) (*models.SourceOwner, error) {
+	var owner models.SourceOwner
+	err := tx.Where("source = ? AND company = ?", source, company).First(&owner).Error
+	if err == nil {
+		if owner.ChildTableName != childTableName || !schemaEqual(owner.TableSchema, schema) {
+			return nil, ErrSourceSchemaMismatch
+		}
+		normalizedInput := strings.TrimSpace(strings.ToLower(websiteDomain))
+		nextWebsiteDomain := owner.WebsiteDomain
+		switch {
+		case normalizedInput != "":
+			nextWebsiteDomain = normalizeWebsiteDomain(source, company, websiteDomain)
+		case strings.TrimSpace(owner.WebsiteDomain) == "":
+			nextWebsiteDomain = normalizeWebsiteDomain(source, company, websiteDomain)
+		}
+		if owner.WebsiteDomain != nextWebsiteDomain {
+			owner.WebsiteDomain = nextWebsiteDomain
+			if err := tx.Model(&owner).Update("website_domain", nextWebsiteDomain).Error; err != nil {
+				return nil, err
+			}
+		}
+		if err := createChildTable(tx, childTableName, schema); err != nil {
+			return nil, err
+		}
+		if err := ensureSourceReplayProtection(tx, source, childTableName, schema); err != nil {
+			return nil, err
+		}
+		return &owner, nil
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	if err := createChildTable(tx, childTableName, schema); err != nil {
+		return nil, err
+	}
+	if err := ensureSourceReplayProtection(tx, source, childTableName, schema); err != nil {
+		return nil, err
+	}
+
+	owner = models.SourceOwner{
+		Source:         source,
+		Company:        company,
+		WebsiteDomain:  normalizeWebsiteDomain(source, company, websiteDomain),
+		ChildTableName: childTableName,
+		TableSchema:    schema,
+	}
+	if err := tx.Create(&owner).Error; err != nil {
+		if isUniqueViolation(err) {
+			return nil, ErrSourceSchemaMismatch
+		}
+		return nil, err
+	}
+
+	return &owner, nil
 }
 
 func (s *PostgresStore) migrateLegacySourceTables(ctx context.Context) error {
@@ -605,7 +1058,7 @@ func (s *PostgresStore) migrateLegacySourceTables(ctx context.Context) error {
 	})
 }
 
-func (s *PostgresStore) enforceReplayProtection(ctx context.Context) error {
+func (s *PostgresStore) backfillSourceOwners(ctx context.Context) error {
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var sources []models.Source
 		if err := tx.Order("id ASC").Find(&sources).Error; err != nil {
@@ -613,12 +1066,68 @@ func (s *PostgresStore) enforceReplayProtection(ctx context.Context) error {
 		}
 
 		for _, source := range sources {
-			schema, err := normalizeSchema(source.TableSchema)
+			normalized, err := normalizeLegacySource(source)
 			if err != nil {
 				return err
 			}
 
-			if err := ensureSourceReplayProtection(tx, source.Source, source.ChildTableName, schema); err != nil {
+			owner, err := ensureSourceOwnerTx(tx, normalized.Source, normalized.Company, "", normalized.ChildTableName, normalized.TableSchema)
+			if err != nil {
+				return err
+			}
+
+			if err := tx.Model(&models.Source{}).
+				Where("id = ?", normalized.ID).
+				Updates(map[string]any{
+					"source_owner_id":  owner.ID,
+					"child_table_name": owner.ChildTableName,
+					"table_schema":     owner.TableSchema,
+				}).Error; err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+func (s *PostgresStore) backfillSourceOwnerWebsiteDomains(ctx context.Context) error {
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var owners []models.SourceOwner
+		if err := tx.Order("id ASC").Find(&owners).Error; err != nil {
+			return err
+		}
+
+		for _, owner := range owners {
+			nextDomain := normalizeWebsiteDomain(owner.Source, owner.Company, owner.WebsiteDomain)
+			if owner.WebsiteDomain == nextDomain {
+				continue
+			}
+			if err := tx.Model(&models.SourceOwner{}).
+				Where("id = ?", owner.ID).
+				Update("website_domain", nextDomain).Error; err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+func (s *PostgresStore) enforceReplayProtection(ctx context.Context) error {
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var owners []models.SourceOwner
+		if err := tx.Order("id ASC").Find(&owners).Error; err != nil {
+			return err
+		}
+
+		for _, owner := range owners {
+			schema, err := normalizeSchema(owner.TableSchema)
+			if err != nil {
+				return err
+			}
+
+			if err := ensureSourceReplayProtection(tx, owner.Source, owner.ChildTableName, schema); err != nil {
 				return err
 			}
 		}
@@ -665,6 +1174,37 @@ func replayProtectionColumnForSource(source string, schema models.TableSchema) s
 	}
 
 	return ""
+}
+
+func normalizeWebsiteDomain(source string, company string, websiteDomain string) string {
+	trimmed := strings.TrimSpace(strings.ToLower(websiteDomain))
+	if trimmed != "" {
+		trimmed = strings.TrimPrefix(strings.TrimPrefix(trimmed, "https://"), "http://")
+		if slash := strings.Index(trimmed, "/"); slash >= 0 {
+			trimmed = trimmed[:slash]
+		}
+		return strings.TrimSpace(trimmed)
+	}
+
+	return defaultWebsiteDomains[strings.ToLower(source)+"::"+strings.ToLower(company)]
+}
+
+func normalizeRequiredWebsiteDomain(websiteDomain string) (string, error) {
+	trimmed := strings.TrimSpace(strings.ToLower(websiteDomain))
+	if trimmed == "" {
+		return "", fmt.Errorf("%w: websiteDomain is required", ErrInvalidWebsiteDomain)
+	}
+
+	trimmed = strings.TrimPrefix(strings.TrimPrefix(trimmed, "https://"), "http://")
+	if slash := strings.Index(trimmed, "/"); slash >= 0 {
+		trimmed = trimmed[:slash]
+	}
+	trimmed = strings.TrimSpace(trimmed)
+	if trimmed == "" {
+		return "", fmt.Errorf("%w: websiteDomain is required", ErrInvalidWebsiteDomain)
+	}
+
+	return trimmed, nil
 }
 
 func firstSchemaColumnMatch(schema models.TableSchema, candidates ...string) string {

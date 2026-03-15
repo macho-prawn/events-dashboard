@@ -55,6 +55,7 @@ class Company:
     city: str
     state: str
     country: str
+    domain: str
     carrier_iata: str
     origin_iata: str
     aircraft_types: tuple[str, ...]
@@ -62,12 +63,13 @@ class Company:
 
 
 COMPANIES = [
-    Company("Delta Air Lines", "delta-air-lines", "delta_air_lines", "Atlanta", "Georgia", "United States", "DL", "ATL", ("Airbus A321", "Boeing 757-200", "Boeing 737-900"), (Destination("LHR", "London", "United Kingdom", 6764, "international"), Destination("JFK", "New York", "United States", 1222, "domestic"), Destination("MIA", "Miami", "United States", 964, "domestic"))),
-    Company("Emirates", "emirates", "emirates", "Dubai", "Dubai Emirate", "United Arab Emirates", "EK", "DXB", ("Airbus A380", "Boeing 777-300ER", "Boeing 777-200LR"), (Destination("SIN", "Singapore", "Singapore", 5840, "international"), Destination("LHR", "London", "United Kingdom", 5500, "international"), Destination("SYD", "Sydney", "Australia", 12039, "international"))),
-    Company("Qantas", "qantas", "qantas", "Sydney", "New South Wales", "Australia", "QF", "SYD", ("Boeing 737-800", "Airbus A330-200", "Boeing 787-9"), (Destination("SIN", "Singapore", "Singapore", 6308, "international"), Destination("MEL", "Melbourne", "Australia", 714, "domestic"), Destination("AKL", "Auckland", "New Zealand", 2160, "international"))),
-    Company("Singapore Airlines", "singapore-airlines", "singapore_airlines", "Singapore", "South East", "Singapore", "SQ", "SIN", ("Airbus A350-900", "Boeing 787-10", "Airbus A380"), (Destination("NRT", "Tokyo", "Japan", 5340, "international"), Destination("SYD", "Sydney", "Australia", 6308, "international"), Destination("BKK", "Bangkok", "Thailand", 1434, "international"))),
-    Company("Southwest Airlines", "southwest-airlines", "southwest_airlines", "Dallas", "Texas", "United States", "WN", "DAL", ("Boeing 737-700", "Boeing 737 MAX 8", "Boeing 737-800"), (Destination("HOU", "Houston", "United States", 385, "domestic"), Destination("DEN", "Denver", "United States", 1066, "domestic"), Destination("PHX", "Phoenix", "United States", 1415, "domestic"))),
-    Company("United Airlines", "united-airlines", "united_airlines", "Chicago", "Illinois", "United States", "UA", "ORD", ("Boeing 737 MAX 9", "Airbus A320", "Boeing 787-8"), (Destination("SFO", "San Francisco", "United States", 2974, "domestic"), Destination("EWR", "Newark", "United States", 1160, "domestic"), Destination("FRA", "Frankfurt", "Germany", 6972, "international"))),
+    Company("Delta Air Lines", "delta-air-lines", "delta_air_lines", "Atlanta", "Georgia", "United States", "delta.com", "DL", "ATL", ("Airbus A321", "Boeing 757-200", "Boeing 737-900"), (Destination("LHR", "London", "United Kingdom", 6764, "international"), Destination("JFK", "New York", "United States", 1222, "domestic"), Destination("MIA", "Miami", "United States", 964, "domestic"))),
+    Company("Emirates", "emirates", "emirates", "Dubai", "Dubai Emirate", "United Arab Emirates", "emirates.com", "EK", "DXB", ("Airbus A380", "Boeing 777-300ER", "Boeing 777-200LR"), (Destination("SIN", "Singapore", "Singapore", 5840, "international"), Destination("LHR", "London", "United Kingdom", 5500, "international"), Destination("SYD", "Sydney", "Australia", 12039, "international"))),
+    Company("IndiGo", "indigo", "indigo", "New Delhi", "Delhi (National Capital Territory)", "India", "goindigo.in", "6E", "DEL", ("Airbus A320neo", "Airbus A321neo", "ATR 72-600"), (Destination("BOM", "Mumbai", "India", 1148, "domestic"), Destination("BLR", "Bengaluru", "India", 1740, "domestic"), Destination("DXB", "Dubai", "United Arab Emirates", 2197, "international"))),
+    Company("Qantas", "qantas", "qantas", "Sydney", "New South Wales", "Australia", "qantas.com", "QF", "SYD", ("Boeing 737-800", "Airbus A330-200", "Boeing 787-9"), (Destination("SIN", "Singapore", "Singapore", 6308, "international"), Destination("MEL", "Melbourne", "Australia", 714, "domestic"), Destination("AKL", "Auckland", "New Zealand", 2160, "international"))),
+    Company("Singapore Airlines", "singapore-airlines", "singapore_airlines", "Singapore", "South East", "Singapore", "singaporeair.com", "SQ", "SIN", ("Airbus A350-900", "Boeing 787-10", "Airbus A380"), (Destination("NRT", "Tokyo", "Japan", 5340, "international"), Destination("SYD", "Sydney", "Australia", 6308, "international"), Destination("BKK", "Bangkok", "Thailand", 1434, "international"))),
+    Company("Southwest Airlines", "southwest-airlines", "southwest_airlines", "Dallas", "Texas", "United States", "southwest.com", "WN", "DAL", ("Boeing 737-700", "Boeing 737 MAX 8", "Boeing 737-800"), (Destination("HOU", "Houston", "United States", 385, "domestic"), Destination("DEN", "Denver", "United States", 1066, "domestic"), Destination("PHX", "Phoenix", "United States", 1415, "domestic"))),
+    Company("United Airlines", "united-airlines", "united_airlines", "Chicago", "Illinois", "United States", "united.com", "UA", "ORD", ("Boeing 737 MAX 9", "Airbus A320", "Boeing 787-8"), (Destination("SFO", "San Francisco", "United States", 2974, "domestic"), Destination("EWR", "Newark", "United States", 1160, "domestic"), Destination("FRA", "Frankfurt", "Germany", 6972, "international"))),
 ]
 
 STATUSES = ("scheduled", "boarding", "departed", "arrived", "delayed")
@@ -102,6 +104,7 @@ ACCESS_JWT="${{ACCESS_JWT:?ACCESS_JWT is required}}" \\
   -i "{company.city}" \\
   -t "{company.state}" \\
   -n "{company.country}" \\
+  -w "{company.domain}" \\
   -j "${{SCRIPT_DIR}}/table_schema.json"
 """
 

@@ -21,34 +21,34 @@ func TestCreateEventReplayProtectionReturnsConflictAndAllowsDifferentOwners(t *t
 
 	ctx := context.Background()
 
-	if _, err := eventStore.CreateSource(ctx, "News", "BBC", "London", "England", "United Kingdom", models.TableSchema{
+	if _, err := eventStore.CreateSource(ctx, "News", "BBC", "London", "England", "United Kingdom", "", models.TableSchema{
 		{Name: "article_id", Type: "text", Required: true},
 		{Name: "headline", Type: "text", Required: true},
 	}); err != nil {
 		t.Fatalf("CreateSource(news primary) error = %v", err)
 	}
-	if _, err := eventStore.CreateSource(ctx, "News", "CNA", "Singapore", "South East", "Singapore", models.TableSchema{
+	if _, err := eventStore.CreateSource(ctx, "News", "CNA", "Singapore", "South East", "Singapore", "", models.TableSchema{
 		{Name: "article_id", Type: "text", Required: true},
 		{Name: "headline", Type: "text", Required: true},
 	}); err != nil {
 		t.Fatalf("CreateSource(news secondary) error = %v", err)
 	}
-	if _, err := eventStore.CreateSource(ctx, "Flights", "Delta Air Lines", "Atlanta", "Georgia", "United States", models.TableSchema{
+	if _, err := eventStore.CreateSource(ctx, "Flights", "Delta Air Lines", "Atlanta", "Georgia", "United States", "", models.TableSchema{
 		{Name: "flight_id", Type: "text", Required: true},
 	}); err != nil {
 		t.Fatalf("CreateSource(flights primary) error = %v", err)
 	}
-	if _, err := eventStore.CreateSource(ctx, "Flights", "United Airlines", "Chicago", "Illinois", "United States", models.TableSchema{
+	if _, err := eventStore.CreateSource(ctx, "Flights", "United Airlines", "Chicago", "Illinois", "United States", "", models.TableSchema{
 		{Name: "flight_id", Type: "text", Required: true},
 	}); err != nil {
 		t.Fatalf("CreateSource(flights secondary) error = %v", err)
 	}
-	if _, err := eventStore.CreateSource(ctx, "Events", "Acme", "Boston", "Massachusetts", "United States", models.TableSchema{
+	if _, err := eventStore.CreateSource(ctx, "Events", "Acme", "Boston", "Massachusetts", "United States", "", models.TableSchema{
 		{Name: "invoice_number", Type: "text", Required: true},
 	}); err != nil {
 		t.Fatalf("CreateSource(events primary) error = %v", err)
 	}
-	if _, err := eventStore.CreateSource(ctx, "ECommerce", "Shopify", "Ottawa", "Ontario", "Canada", models.TableSchema{
+	if _, err := eventStore.CreateSource(ctx, "ECommerce", "Shopify", "Ottawa", "Ontario", "Canada", "", models.TableSchema{
 		{Name: "order_id", Type: "text", Required: true},
 	}); err != nil {
 		t.Fatalf("CreateSource(ecommerce primary) error = %v", err)

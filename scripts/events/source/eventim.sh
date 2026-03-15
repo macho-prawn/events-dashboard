@@ -12,4 +12,5 @@ ACCESS_JWT="${ACCESS_JWT:?ACCESS_JWT is required}" \
   -i "Bremen" \
   -t "Bremen" \
   -n "Germany" \
+  -w "eventim.de" \
   -j "${SCRIPT_DIR}/table_schema.json"

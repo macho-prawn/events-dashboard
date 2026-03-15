@@ -30,7 +30,7 @@ func buildDatabaseURL() string {
 		return databaseURL
 	}
 
-	host := getEnv("DB_HOST", "db")
+	host := getEnv("DB_HOST", "events-dashboard-db")
 	port := getEnv("DB_PORT", "5432")
 	name := os.Getenv("DB_NAME")
 	user := os.Getenv("DB_USER")

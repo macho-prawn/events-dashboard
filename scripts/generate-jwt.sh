@@ -86,7 +86,7 @@ require_command jq
 require_command openssl
 
 query_config() {
-  docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" -p "${COMPOSE_PROJECT_NAME}" exec -T -u "${DB_UID}:${DB_GID}" db \
+  docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" -p "${COMPOSE_PROJECT_NAME}" exec -T -u "${DB_UID}:${DB_GID}" events-dashboard-db \
     sh -lc "psql -U '${DB_USER}' -d '${DB_NAME}' -At -F '|' -c \"select signing_secret, issuer, subject, ingestion_signing_secret, ingestion_issuer, ingestion_subject, ingestion_ttl_seconds from api_key_access where id = 1;\""
 }
 

@@ -12,4 +12,5 @@ ACCESS_JWT="${ACCESS_JWT:?ACCESS_JWT is required}" \
   -i "Sydney" \
   -t "New South Wales" \
   -n "Australia" \
+  -w "moshtix.com.au" \
   -j "${SCRIPT_DIR}/table_schema.json"

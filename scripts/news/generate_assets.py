@@ -91,6 +91,7 @@ ACCESS_JWT="${{ACCESS_JWT:?ACCESS_JWT is required}}" \\
   -i "{company.city}" \\
   -t "{company.state}" \\
   -n "{company.country}" \\
+  -w "{company.domain}" \\
   -j "${{SCRIPT_DIR}}/table_schema.json"
 """
 

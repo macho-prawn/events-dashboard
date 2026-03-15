@@ -12,4 +12,5 @@ ACCESS_JWT="${ACCESS_JWT:?ACCESS_JWT is required}" \
   -i "Mumbai" \
   -t "Maharashtra" \
   -n "India" \
+  -w "bookmyshow.com" \
   -j "${SCRIPT_DIR}/table_schema.json"

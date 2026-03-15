@@ -12,4 +12,5 @@ ACCESS_JWT="${ACCESS_JWT:?ACCESS_JWT is required}" \
   -i "Lima" \
   -t "Lima Region" \
   -n "Peru" \
+  -w "gestion.pe" \
   -j "${SCRIPT_DIR}/table_schema.json"

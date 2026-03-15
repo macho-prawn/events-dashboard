@@ -52,6 +52,25 @@ func (m *Manager) Token() (string, *time.Time, error) {
 }
 
 func (m *Manager) Validate(token string) error {
+	_, err := m.parseClaims(token)
+	return err
+}
+
+func (m *Manager) ExpiresAt(token string) (*time.Time, error) {
+	claims, err := m.parseClaims(token)
+	if err != nil {
+		return nil, err
+	}
+
+	if claims.ExpiresAt == nil {
+		return nil, nil
+	}
+
+	expiresAt := claims.ExpiresAt.Time.UTC()
+	return &expiresAt, nil
+}
+
+func (m *Manager) parseClaims(token string) (*Claims, error) {
 	parsed, err := jwt.ParseWithClaims(token, &Claims{}, func(candidate *jwt.Token) (any, error) {
 		if candidate.Method.Alg() != jwt.SigningMethodHS256.Alg() {
 			return nil, fmt.Errorf("unexpected signing method: %s", candidate.Method.Alg())
@@ -60,23 +79,23 @@ func (m *Manager) Validate(token string) error {
 		return m.secret, nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	claims, ok := parsed.Claims.(*Claims)
 	if !ok || !parsed.Valid {
-		return errors.New("invalid token")
+		return nil, errors.New("invalid token")
 	}
 
 	if claims.Issuer != m.issuer {
-		return fmt.Errorf("unexpected issuer: %s", claims.Issuer)
+		return nil, fmt.Errorf("unexpected issuer: %s", claims.Issuer)
 	}
 
 	if claims.Subject != m.subject {
-		return fmt.Errorf("unexpected subject: %s", claims.Subject)
+		return nil, fmt.Errorf("unexpected subject: %s", claims.Subject)
 	}
 
-	return nil
+	return claims, nil
 }
 
 func (m *Manager) generateToken(now time.Time) (string, *time.Time, error) {

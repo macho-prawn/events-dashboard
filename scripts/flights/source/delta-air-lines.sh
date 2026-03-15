@@ -12,4 +12,5 @@ ACCESS_JWT="${ACCESS_JWT:?ACCESS_JWT is required}" \
   -i "Atlanta" \
   -t "Georgia" \
   -n "United States" \
+  -w "delta.com" \
   -j "${SCRIPT_DIR}/table_schema.json"

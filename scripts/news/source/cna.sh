@@ -12,4 +12,5 @@ ACCESS_JWT="${ACCESS_JWT:?ACCESS_JWT is required}" \
   -i "Singapore" \
   -t "South East" \
   -n "Singapore" \
+  -w "channelnewsasia.com" \
   -j "${SCRIPT_DIR}/table_schema.json"

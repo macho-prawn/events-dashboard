@@ -12,4 +12,5 @@ ACCESS_JWT="${ACCESS_JWT:?ACCESS_JWT is required}" \
   -i "London" \
   -t "England" \
   -n "United Kingdom" \
+  -w "dice.fm" \
   -j "${SCRIPT_DIR}/table_schema.json"

@@ -12,4 +12,5 @@ ACCESS_JWT="${ACCESS_JWT:?ACCESS_JWT is required}" \
   -i "Dallas" \
   -t "Texas" \
   -n "United States" \
+  -w "southwest.com" \
   -j "${SCRIPT_DIR}/table_schema.json"
