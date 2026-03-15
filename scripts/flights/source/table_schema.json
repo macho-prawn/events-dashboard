@@ -1,0 +1,107 @@
+[
+  {
+    "name": "flight_id",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "flight_number",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "carrier_name",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "carrier_iata",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "origin_iata",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "origin_city",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "origin_country",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "destination_iata",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "destination_city",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "destination_country",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "scheduled_departure_at",
+    "type": "timestamptz",
+    "required": true
+  },
+  {
+    "name": "scheduled_arrival_at",
+    "type": "timestamptz",
+    "required": true
+  },
+  {
+    "name": "actual_departure_at",
+    "type": "timestamptz",
+    "required": false
+  },
+  {
+    "name": "actual_arrival_at",
+    "type": "timestamptz",
+    "required": false
+  },
+  {
+    "name": "status",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "aircraft_type",
+    "type": "text",
+    "required": false
+  },
+  {
+    "name": "terminal",
+    "type": "text",
+    "required": false
+  },
+  {
+    "name": "gate",
+    "type": "text",
+    "required": false
+  },
+  {
+    "name": "baggage_claim",
+    "type": "text",
+    "required": false
+  },
+  {
+    "name": "is_codeshare",
+    "type": "boolean",
+    "required": false
+  },
+  {
+    "name": "route_metadata",
+    "type": "jsonb",
+    "required": false
+  }
+]

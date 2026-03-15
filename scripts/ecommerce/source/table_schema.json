@@ -1,0 +1,102 @@
+[
+  {
+    "name": "order_id",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "order_number",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "storefront",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "customer_name",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "customer_email",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "currency",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "subtotal_amount",
+    "type": "numeric",
+    "required": true
+  },
+  {
+    "name": "shipping_amount",
+    "type": "numeric",
+    "required": true
+  },
+  {
+    "name": "tax_amount",
+    "type": "numeric",
+    "required": true
+  },
+  {
+    "name": "discount_amount",
+    "type": "numeric",
+    "required": false
+  },
+  {
+    "name": "total_amount",
+    "type": "numeric",
+    "required": true
+  },
+  {
+    "name": "item_count",
+    "type": "integer",
+    "required": true
+  },
+  {
+    "name": "payment_status",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "fulfillment_status",
+    "type": "text",
+    "required": true
+  },
+  {
+    "name": "placed_at",
+    "type": "timestamptz",
+    "required": true
+  },
+  {
+    "name": "updated_at",
+    "type": "timestamptz",
+    "required": false
+  },
+  {
+    "name": "is_expedited",
+    "type": "boolean",
+    "required": false
+  },
+  {
+    "name": "shipping_address",
+    "type": "jsonb",
+    "required": false
+  },
+  {
+    "name": "line_items",
+    "type": "jsonb",
+    "required": false
+  },
+  {
+    "name": "order_metadata",
+    "type": "jsonb",
+    "required": false
+  }
+]
