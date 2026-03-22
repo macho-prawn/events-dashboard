@@ -118,7 +118,7 @@ flowchart LR
    ```
 3. Start the stack from the repo root:
    ```bash
-   docker compose -f docker-compose.yml --env-file .env up --build
+   docker compose -f docker-compose.yml --env-file .env up --build --detach
    ```
 4. Check the health endpoint:
    ```bash
@@ -126,6 +126,10 @@ flowchart LR
    ```
 5. The API will be available at `http://localhost:3000`.
 6. The dashboard frontend will be available at `http://localhost:8081`.
+7. Start the stack from the repo root:
+   ```bash
+   docker compose -f docker-compose.yml --env-file .env down
+   ```
 
 [Back to top](#top)
 
@@ -185,7 +189,7 @@ go test ./...
 [Back to top](#top)
 
 ## Development Attribution
-- Principal developer: Codex (GPT-5 coding agent). _// old N00b � assisted a bit_
+- Principal developer: Codex (GPT-5 coding agent). _// old N00b assisted a bit_
 - Collaboration model: iterative prompt-driven development in the local repo with incremental implementation, debugging, and U
 X refinement.
 
